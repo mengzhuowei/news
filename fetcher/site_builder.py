@@ -15,6 +15,7 @@ from loguru import logger
 SITE_TITLE = os.getenv("SITE_TITLE", "Global News Digest")
 SITE_BASEURL = os.getenv("SITE_BASEURL", "")
 ADSENSE_CLIENT_ID = os.getenv("ADSENSE_CLIENT_ID", "")
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 ARTICLES_PER_PAGE = 20
 
 
@@ -262,6 +263,7 @@ class SiteBuilder:
         ctx = {
             "site_title": SITE_TITLE,
             "adsense_client_id": ADSENSE_CLIENT_ID,
+            "telegram_bot_username": TELEGRAM_BOT_USERNAME,
             "hero_article": all_articles[0] if all_articles else None,
             "hero_side_articles": all_articles[1:4],
             "latest_articles": all_articles[4:10],

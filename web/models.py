@@ -32,14 +32,19 @@ class Subscription(Base):
     __tablename__ = 'subscriptions'
 
     id = Column(BigInteger, primary_key=True)
-    email = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), nullable=True)  # Telegram 订阅时可选
+    chat_id = Column(BigInteger, unique=True, nullable=True)  # Telegram chat_id
     is_active = Column(Boolean, default=True)
     frequency = Column(Enum('daily', 'weekly'), default='daily')
+    push_time = Column(String(8), default='09:00:00')  # HH:MM:SS 格式
+    timezone = Column(String(50), default='UTC')
+    push_channel = Column(Enum('telegram', 'email'), default='telegram')
     site = Column(String(100))
     categories = Column(JSON)
     confirm_token = Column(String(64))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     confirmed_at = Column(DateTime)
+    last_pushed_at = Column(DateTime)
 
 
 class EmailLog(Base):

@@ -45,6 +45,18 @@
     </div>
 
     <div class="sidebar">
+        <div class="subscribe-box">
+            <h3>📬 Subscribe</h3>
+            <p>Get daily news digests via Telegram</p>
+            {% if telegram_bot_username %}
+            <a href="https://t.me/{{ telegram_bot_username }}" class="subscribe-btn" target="_blank">
+                Open Telegram Bot
+            </a>
+            {% else %}
+            <a href="/subscribe" class="subscribe-btn">Subscribe Now</a>
+            {% endif %}
+        </div>
+
         <h3>Categories</h3>
         <ul class="category-list">
             {% for name, section in sections.items() %}

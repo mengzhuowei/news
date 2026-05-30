@@ -65,8 +65,44 @@ services:
       - SITE_TITLE=${SITE_TITLE:-Global News Digest}
       - DIST_DIR=/app/dist
       - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
     volumes:
       - ./dist:/app/dist
+    networks:
+      - news-network
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    command: python -m web.telegram_bot
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - SITE_BASEURL=${SITE_BASEURL:-}
+    networks:
+      - news-network
+
+  push-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.fetcher
+    restart: unless-stopped
+    command: python -m fetcher.push_scheduler
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - PUSH_CHECK_INTERVAL=${PUSH_CHECK_INTERVAL:-60}
+      - ARTICLES_PER_PUSH=${ARTICLES_PER_PUSH:-10}
     networks:
       - news-network
 
