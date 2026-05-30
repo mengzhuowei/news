@@ -10,3 +10,4 @@ markdown>=3.5
 loguru>=0.7
 httpx>=0.25
 python-telegram-bot>=20.0
+python-dotenv>=1.0

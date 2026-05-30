@@ -2,6 +2,11 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载 .env 文件（必须在导入其他模块之前）
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
