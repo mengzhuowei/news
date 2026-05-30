@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ site_title }}{% endblock %}
+{% block description %}{{ page.summary[:160] }}{% endblock %}
+
+{% block head %}
+<meta property="og:title" content="{{ page.title }}">
+<meta property="og:description" content="{{ page.summary[:160] }}">
+{% if page.image %}
+<meta property="og:image" content="{{ page.image }}">
+{% endif %}
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="{{ page.published_iso }}">
+<meta property="article:author" content="{{ page.author }}">
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": {{ page.title | tojson }},
+    "datePublished": {{ page.published_iso | tojson }},
+    "author": {"@type": "Person", "name": {{ page.author | tojson }}},
+    "publisher": {"@type": "Organization", "name": {{ site_title | tojson }}}
+    {% if page.image %},"image": {{ page.image | tojson }}{% endif %}
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<article class="article-content">
+    <span class="source-badge">{{ page.source }}</span>
+    <h1>{{ page.title }}</h1>
+    <div class="article-meta" style="margin-bottom: 1.5rem;">
+        {{ page.published_display }} &middot; {{ page.author }} &middot;
+        <a href="{{ page.source_url }}" target="_blank" rel="noopener">Original Source</a>
+    </div>
+
+    {% if page.image %}
+    <img src="{{ page.image }}" alt="{{ page.title }}" style="width: 100%; border-radius: 8px; margin-bottom: 1.5rem;">
+    {% endif %}
+
+    {% if adsense_client_id %}
+    <ins class="adsbygoogle" style="display:block; margin-bottom: 1.5rem;" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    {% endif %}
+
+    <div class="content-body">
+        {{ page.content_html | safe }}
+    </div>
+
+    {% if adsense_client_id %}
+    <div style="margin-top: 2rem;">
+        <ins class="adsbygoogle" style="display:block;" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    </div>
+    {% endif %}
+</article>
+{% endblock %}

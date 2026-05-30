@@ -1,0 +1,78 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: news_aggregator
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - news-network
+
+  fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.fetcher
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL=${LLM_MODEL:-gpt-3.5-turbo}
+      - CONTENT_ENRICHMENT=${CONTENT_ENRICHMENT:-true}
+      - ENRICHMENT_CONCURRENT=${ENRICHMENT_CONCURRENT:-3}
+      - UPDATE_INTERVAL=${UPDATE_INTERVAL:-15}
+      - SITE_BASEURL=${SITE_BASEURL:-}
+      - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
+    volumes:
+      - ./dist:/app/dist
+      - ./shared-content:/app/shared-content
+    networks:
+      - news-network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@newsaggregator.com}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - SITE_BASEURL=${SITE_BASEURL:-}
+      - SITE_TITLE=${SITE_TITLE:-Global News Digest}
+      - DIST_DIR=/app/dist
+      - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
+    volumes:
+      - ./dist:/app/dist
+    networks:
+      - news-network
+
+volumes:
+  mysql_data:
+
+networks:
+  news-network:
+    driver: bridge

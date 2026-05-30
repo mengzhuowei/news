@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY web/requirements.txt /app/web/requirements.txt
+COPY fetcher/requirements.txt /app/fetcher/requirements.txt
+
+RUN pip install --no-cache-dir \
+    -r /app/web/requirements.txt \
+    -r /app/fetcher/requirements.txt
+
+COPY web/ /app/web/
+COPY fetcher/ /app/fetcher/
+COPY shared/ /app/shared/
+COPY admin/ /app/admin/
+
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "web.app:app", "--host", "0.0.0.0", "--port", "8000"]

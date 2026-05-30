@@ -1,0 +1,57 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD }}
+          MYSQL_DATABASE: news_aggregator
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r fetcher/requirements.txt
+          pip install -r web/requirements.txt
+
+      - name: Fetch content
+        run: python -m fetcher.scheduler --once
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD }}
+
+      - name: Build static site
+        run: python -c "import os; from fetcher.site_builder import SiteBuilder; from pathlib import Path; success = SiteBuilder(Path('shared-content'), Path(os.getenv('DIST_DIR', 'dist')), use_db=True).build_all(); exit(0 if success else 1)"
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD }}
+
+      - name: Deploy
+        run: bash shared/scripts/deploy.sh
+        env:
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}

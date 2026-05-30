@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+    <meta name="description" content="{% block description %}Global news aggregation from BBC, Reuters, Bloomberg and more{% endblock %}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #f8f9fa; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        header { background: #1a1a2e; color: white; padding: 1rem 0; }
+        header h1 { font-size: 1.8rem; }
+        header a { color: white; text-decoration: none; }
+        nav { background: #16213e; padding: 0.5rem 0; }
+        nav a { color: #e0e0e0; text-decoration: none; margin-right: 1.5rem; font-size: 0.9rem; }
+        nav a:hover { color: #e94560; }
+        main { padding: 2rem 0; min-height: 60vh; }
+        footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 1.5rem 0; margin-top: 2rem; }
+        .article-card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .article-card h2 { font-size: 1.3rem; margin-bottom: 0.5rem; }
+        .article-card h2 a { color: #1a1a2e; text-decoration: none; }
+        .article-card h2 a:hover { color: #e94560; }
+        .article-meta { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .article-summary { color: #555; }
+        .hero { background: white; border-radius: 8px; overflow: hidden; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .hero img { width: 100%; height: 300px; object-fit: cover; }
+        .hero-content { padding: 2rem; }
+        .hero-content h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .sidebar { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .sidebar h3 { margin-bottom: 1rem; color: #1a1a2e; }
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .pagination { display: flex; gap: 0.5rem; margin-top: 2rem; }
+        .pagination a, .pagination span { padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; }
+        .pagination a { background: #e94560; color: white; }
+        .pagination span { background: #ddd; color: #666; }
+        .source-badge { display: inline-block; background: #e94560; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        .category-list { list-style: none; }
+        .category-list li { padding: 0.3rem 0; }
+        .category-list a { color: #1a1a2e; text-decoration: none; }
+        .category-list a:hover { color: #e94560; }
+        .article-content { background: white; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .article-content h1 { font-size: 2rem; margin-bottom: 1rem; }
+        .article-content .content-body { line-height: 1.8; }
+        .article-content .content-body p { margin-bottom: 1rem; }
+    </style>
+    {% block head %}{% endblock %}
+    {% if adsense_client_id %}
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_client_id }}" crossorigin="anonymous"></script>
+    {% endif %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><a href="/">{{ site_title }}</a></h1>
+        </div>
+    </header>
+    <nav>
+        <div class="container">
+            {% for name, section in sections.items() %}
+                <a href="/{{ name }}/">{{ name }} ({{ section.count }})</a>
+            {% endfor %}
+        </div>
+    </nav>
+    <main>
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 {{ site_title }}. Aggregated from multiple sources.</p>
+        </div>
+    </footer>
+</body>
+</html>

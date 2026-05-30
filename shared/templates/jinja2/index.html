@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div>
+        {% if hero_article %}
+        <div class="hero">
+            {% if hero_article.image %}
+            <img src="{{ hero_article.image }}" alt="{{ hero_article.title }}">
+            {% endif %}
+            <div class="hero-content">
+                <span class="source-badge">{{ hero_article.source }}</span>
+                <h2><a href="{{ hero_article.permalink }}">{{ hero_article.title }}</a></h2>
+                <div class="article-meta">
+                    {{ hero_article.published_display }} &middot; {{ hero_article.author }}
+                </div>
+                <p class="article-summary">{{ hero_article.summary }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if hero_side_articles %}
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+            {% for article in hero_side_articles %}
+            <div class="article-card">
+                <span class="source-badge">{{ article.source }}</span>
+                <h2 style="font-size: 1rem;"><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                <div class="article-meta">{{ article.published_display }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <h3 style="margin-bottom: 1rem;">Latest News</h3>
+        {% for article in latest_articles %}
+        <div class="article-card">
+            <span class="source-badge">{{ article.source }}</span>
+            <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+            <div class="article-meta">
+                {{ article.published_display }} &middot; {{ article.category }} &middot; {{ article.author }}
+            </div>
+            <p class="article-summary">{{ article.summary }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="sidebar">
+        <h3>Categories</h3>
+        <ul class="category-list">
+            {% for name, section in sections.items() %}
+            <li><a href="/{{ name }}/">{{ name }} ({{ section.count }})</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY fetcher/requirements.txt /app/fetcher/requirements.txt
+COPY web/requirements.txt /app/web/requirements.txt
+
+RUN pip install --no-cache-dir \
+    -r /app/fetcher/requirements.txt \
+    -r /app/web/requirements.txt
+
+COPY fetcher/ /app/fetcher/
+COPY web/ /app/web/
+COPY shared/ /app/shared/
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "fetcher.scheduler"]

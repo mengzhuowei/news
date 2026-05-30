@@ -1,0 +1,35 @@
+# 环境变量 — 包含密码和 API Key，禁止提交
+.env
+
+# 构建产物 — 可通过 `docker compose exec fetcher python -m fetcher.scheduler --once` 重新生成
+dist/
+
+# 抓取生成的 Markdown 内容 — 运行时自动生成
+shared-content/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+*.egg
+
+# 测试 / 覆盖率
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code 会话数据
+.claude/
