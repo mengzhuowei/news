@@ -59,6 +59,10 @@ class SiteBuilder:
         ctx.update(extra)
         return ctx
 
+    @property
+    def _site_url(self) -> str:
+        return self.site_baseurl or f"https://{self.site_title.lower().replace(' ', '-')}.com"
+
     def _load_from_db(self) -> dict[str, list[dict]]:
         """从数据库读取文章，按分类组织"""
         from web.database import SessionLocal
@@ -93,7 +97,7 @@ class SiteBuilder:
                     "published_display": (
                         f"{calendar.month_name[date.month]} {date.day}, {date.year}"
                     ),
-                    "permalink": f"{self.site_baseurl}/{category}/{slug}/",
+                    "permalink": f"{self._site_url}/{category}/{slug}/",
                     "slug": slug,
                     "section": category,
                     "rewritten": a.is_rewritten or False,
@@ -139,7 +143,7 @@ class SiteBuilder:
                     "published_display": (
                         f"{calendar.month_name[date.month]} {date.day}, {date.year}"
                     ),
-                    "permalink": f"{self.site_baseurl}/{category}/{slug}/",
+                    "permalink": f"{self._site_url}/{category}/{slug}/",
                     "slug": slug,
                     "section": category,
                     "rewritten": False,
@@ -256,9 +260,9 @@ class SiteBuilder:
             out_dir = self.output_dir / section_name / "page" / str(page_num)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        canonical_url = f"{self.site_baseurl}/{section_name}/"
+        canonical_url = f"{self._site_url}/{section_name}/"
         if page_num > 1:
-            canonical_url = f"{self.site_baseurl}/{section_name}/page/{page_num}/"
+            canonical_url = f"{self._site_url}/{section_name}/page/{page_num}/"
 
         prev_url = None
         if page_num > 1:
@@ -290,11 +294,10 @@ class SiteBuilder:
         )
         template = self.env.get_template("index.html")
         ctx = self._base_ctx(
-            telegram_bot_username=self.telegram_bot_username,
             hero_article=all_articles[0] if all_articles else None,
             hero_side_articles=all_articles[1:4],
             latest_articles=all_articles[4:10],
-            canonical_url=f"{self.site_baseurl}/",
+            canonical_url=f"{self._site_url}/",
             sections={k: {"count": len(v)} for k, v in sections.items()},
         )
         (self.output_dir / "index.html").write_text(
@@ -309,14 +312,14 @@ class SiteBuilder:
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         home_el = SubElement(urlset, "url")
-        SubElement(home_el, "loc").text = f"{self.site_baseurl}/"
+        SubElement(home_el, "loc").text = f"{self._site_url}/"
         SubElement(home_el, "lastmod").text = now_iso
         SubElement(home_el, "changefreq").text = "hourly"
         SubElement(home_el, "priority").text = "1.0"
 
         for section_name, articles in sections.items():
             cat_el = SubElement(urlset, "url")
-            SubElement(cat_el, "loc").text = f"{self.site_baseurl}/{section_name}/"
+            SubElement(cat_el, "loc").text = f"{self._site_url}/{section_name}/"
             SubElement(cat_el, "lastmod").text = articles[0]["published_iso"] if articles else now_iso
             SubElement(cat_el, "changefreq").text = "hourly"
             SubElement(cat_el, "priority").text = "0.8"
@@ -358,7 +361,7 @@ class SiteBuilder:
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<rss version="2.0">\n<channel>\n'
             f'  <title>{_escape_xml(self.site_title)}</title>\n'
-            f'  <link>{_escape_xml(self.site_baseurl)}/</link>\n'
+            f'  <link>{_escape_xml(self._site_url)}/</link>\n'
             f'  <description>{_escape_xml(self.site_title)} - News Aggregator</description>\n'
             f'{chr(10).join(items)}\n'
             '</channel>\n</rss>'
@@ -367,7 +370,7 @@ class SiteBuilder:
 
     def build_robots_txt(self):
         """生成 robots.txt"""
-        sitemap_url = f"{self.site_baseurl}/sitemap.xml" if self.site_baseurl else "/sitemap.xml"
+        sitemap_url = f"{self._site_url}/sitemap.xml"
         content = (
             "User-agent: *\n"
             "Allow: /\n"
