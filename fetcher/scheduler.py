@@ -32,6 +32,7 @@ _CATEGORY_MAP = {
 
 BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
+REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
 
 
 def make_slug(source: str, title: str, article_id: int = 0) -> str:
@@ -52,13 +53,13 @@ class FetchScheduler:
         self.summarizer = Summarizer()
         self.enricher = ContentEnricher(
             enabled=os.getenv("CONTENT_ENRICHMENT", "true").lower() == "true",
-            max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "3")),
+            max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "5")),
         )
         self._build_lock = threading.Lock()
         self._last_build_at: Optional[datetime] = None
 
     async def fetch_and_process(self):
-        """完整抓取流程：抓取 → 充实 → 去重 → 清洗 → 洗稿 → 入库(增量构建) → 清理 → 最终构建"""
+        """完整抓取流程：抓取 → 去重URL → 过滤已入库 → 充实 → 清洗 → 洗稿 → 入库 → 清理 → 构建"""
         logger.info(f"[{datetime.now(timezone.utc)}] Starting scheduled fetch...")
 
         self.cleaner._seen_hashes.clear()
@@ -77,37 +78,37 @@ class FetchScheduler:
                     articles.append(article)
 
             if not articles:
+                logger.info("No articles fetched, skipping")
                 return
 
             for article in articles:
                 article.category = _CATEGORY_MAP.get(article.category, article.category)
 
+            existing_urls = await asyncio.to_thread(self._batch_check_db, articles)
+            new_articles = [a for a in articles if a.url not in existing_urls]
+            logger.info(f"Fetched {len(articles)} articles, {len(new_articles)} new, {len(existing_urls)} already in DB")
+
+            if not new_articles:
+                logger.info("No new articles to process")
+                return
+
             if self.enricher.enabled:
-                articles = await self.enricher.enrich_batch(articles)
+                logger.info(f"Enriching {len(new_articles)} articles...")
+                new_articles = await self.enricher.enrich_batch(new_articles)
 
             saved_count = 0
-            for article in articles:
-                if await asyncio.to_thread(self._is_in_db, article.url):
-                    continue
-
-                cleaned = self.cleaner.clean(article)
-                if not cleaned:
-                    continue
-
-                if self.summarizer.api_key:
-                    rewritten_content, rewritten_summary = await self.summarizer.rewrite(
-                        cleaned.title, cleaned.content,
-                    )
-                    cleaned.content = rewritten_content
-                    cleaned.summary = rewritten_summary
-                    cleaned.rewritten = True
-                else:
+            if self.summarizer.api_key:
+                logger.info(f"Rewriting {len(new_articles)} articles (concurrency={REWRITE_CONCURRENT})...")
+                saved_count = await self._process_with_rewrite(new_articles)
+            else:
+                for article in new_articles:
+                    cleaned = self.cleaner.clean(article)
+                    if not cleaned:
+                        continue
+                    cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
                     cleaned.rewritten = False
-
-                cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
-
-                await asyncio.to_thread(self._save_to_db, cleaned)
-                saved_count += 1
+                    await asyncio.to_thread(self._save_to_db, cleaned)
+                    saved_count += 1
 
                 if saved_count % BUILD_BATCH_SIZE == 0:
                     self._try_async_build(f"batch ({saved_count} saved)")
@@ -121,6 +122,56 @@ class FetchScheduler:
 
         except Exception as e:
             logger.error(f"Fetch error: {e}")
+
+    async def _process_with_rewrite(self, articles: list) -> int:
+        """并发洗稿 + 入库流水线"""
+        semaphore = asyncio.Semaphore(REWRITE_CONCURRENT)
+        saved_count = 0
+
+        async def _process_one(article):
+            nonlocal saved_count
+            cleaned = self.cleaner.clean(article)
+            if not cleaned:
+                return
+
+            async with semaphore:
+                rewritten_content, rewritten_summary = await self.summarizer.rewrite(
+                    cleaned.title, cleaned.content,
+                )
+
+            cleaned.content = rewritten_content
+            cleaned.summary = rewritten_summary
+            cleaned.rewritten = True
+            cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
+
+            await asyncio.to_thread(self._save_to_db, cleaned)
+            saved_count += 1
+
+            if saved_count % BUILD_BATCH_SIZE == 0:
+                self._try_async_build(f"batch ({saved_count} saved)")
+                logger.info(f"Progress: {saved_count} articles saved")
+
+        tasks = [_process_one(a) for a in articles]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        return saved_count
+
+    def _batch_check_db(self, articles: list) -> set:
+        """批量查询已存在的 URL，一次 DB 查询替代 N 次单条查询"""
+        from web.database import SessionLocal
+        from web.models import Article as ArticleModel
+
+        urls = [a.url for a in articles]
+        existing = set()
+        batch_size = 500
+        db = SessionLocal()
+        try:
+            for i in range(0, len(urls), batch_size):
+                chunk = urls[i:i + batch_size]
+                rows = db.query(ArticleModel.url).filter(ArticleModel.url.in_(chunk)).all()
+                existing.update(r[0] for r in rows)
+        finally:
+            db.close()
+        return existing
 
     def _try_async_build(self, reason: str = ""):
         """尝试在后台线程异步构建站点（带节流）"""
@@ -146,9 +197,7 @@ class FetchScheduler:
             project_root = Path(__file__).parent.parent
             output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
             builder = SiteBuilder(
-                content_dir=project_root / "shared-content",
                 output_dir=output_dir,
-                use_db=True,
             )
             success = builder.build_all()
             if success:
@@ -245,24 +294,12 @@ class FetchScheduler:
         finally:
             db.close()
 
-    def _is_in_db(self, url: str) -> bool:
-        """检查文章是否已在数据库中"""
-        from web.database import SessionLocal
-        from web.models import Article as ArticleModel
-
-        db = SessionLocal()
-        try:
-            return db.query(ArticleModel).filter(ArticleModel.url == url).first() is not None
-        finally:
-            db.close()
-
     def _cleanup_expired_articles(self, days: int = 7):
-        """清理过期文章（分批处理，同时删除关联的 Markdown 文件）"""
+        """清理过期文章"""
         from web.database import SessionLocal
         from web.models import Article as ArticleModel
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        content_dir = Path(os.getenv("CONTENT_DIR", str(Path(__file__).parent.parent / "shared-content")))
         batch_size = 500
         db = SessionLocal()
         try:
@@ -271,15 +308,9 @@ class FetchScheduler:
                 articles = db.query(ArticleModel).filter(ArticleModel.published_at < cutoff).limit(batch_size).all()
                 if not articles:
                     break
-                file_info = [(a.slug, a.category) for a in articles]
                 for article in articles:
                     db.delete(article)
                 db.commit()
-                for slug, category in file_info:
-                    if slug:
-                        md_path = content_dir / (category or "uncategorized") / f"{slug}.md"
-                        if md_path.exists():
-                            md_path.unlink()
                 total_removed += len(articles)
             logger.info(f"Cleaned up {total_removed} expired articles")
         except Exception as e:
@@ -295,9 +326,7 @@ class FetchScheduler:
         project_root = Path(__file__).parent.parent
         output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
         builder = SiteBuilder(
-            content_dir=project_root / "shared-content",
             output_dir=output_dir,
-            use_db=True,
         )
         success = builder.build_all()
         with self._build_lock:
@@ -317,6 +346,10 @@ class FetchScheduler:
 
 async def main():
     import sys
+    from web.database import init_db
+
+    init_db()
+
     interval = int(os.getenv("UPDATE_INTERVAL", "15"))
     scheduler = FetchScheduler(interval_minutes=interval)
 

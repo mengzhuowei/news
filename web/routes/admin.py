@@ -114,11 +114,6 @@ async def get_article(
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    md_path = (
-        Path(os.getenv("CONTENT_DIR", "./shared-content"))
-        / (article.category or "uncategorized")
-        / f"{article.slug}.md"
-    )
     return {
         "id": article.id,
         "url": article.url,
@@ -128,7 +123,6 @@ async def get_article(
         "slug": article.slug,
         "is_rewritten": article.is_rewritten,
         "is_built": article.is_built,
-        "has_md_file": md_path.exists(),
         "published_at": article.published_at.isoformat() if article.published_at else None,
         "created_at": article.created_at.isoformat() if article.created_at else None,
     }
@@ -145,20 +139,9 @@ async def delete_article(
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    md_file_deleted = False
-    if article.slug:
-        md_path = (
-            Path(os.getenv("CONTENT_DIR", "./shared-content"))
-            / (article.category or "uncategorized")
-            / f"{article.slug}.md"
-        )
-        if md_path.exists():
-            md_path.unlink()
-            md_file_deleted = True
-
     db.delete(article)
     db.commit()
-    return {"status": "deleted", "md_file_deleted": md_file_deleted}
+    return {"status": "deleted"}
 
 
 @router.post("/articles/cleanup")
@@ -169,8 +152,6 @@ async def cleanup_articles(
 ):
     """清理过期文章（分批处理，需认证）"""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    content_dir = Path(os.getenv("CONTENT_DIR", "./shared-content"))
-    removed_files = 0
     removed_db = 0
     batch_size = 500
 
@@ -184,28 +165,13 @@ async def cleanup_articles(
         if not articles:
             break
 
-        # 先提取文件元数据（commit 后 ORM 对象过期，无法再访问属性）
-        file_info = [(a.slug, a.category) for a in articles]
-
-        # 先提交 DB 删除，再清理文件（防止文件删了但 DB 回滚导致孤立数据）
         for article in articles:
             db.delete(article)
         db.commit()
 
-        # DB 提交成功后再清理文件
-        try:
-            for slug, category in file_info:
-                if slug:
-                    md_path = content_dir / (category or "uncategorized") / f"{slug}.md"
-                    if md_path.exists():
-                        md_path.unlink()
-                        removed_files += 1
-        except Exception as e:
-            logger.error(f"File cleanup error: {e}")
-
         removed_db += len(articles)
 
-    return {"removed_files": removed_files, "removed_db": removed_db}
+    return {"removed_db": removed_db}
 
 
 @router.get("/fetch/logs")
@@ -329,7 +295,7 @@ async def trigger_build(admin: str = Depends(verify_credentials)):
     def _build():
         global _build_status
         try:
-            builder = SiteBuilder(project_root / "shared-content", output_dir, use_db=True)
+            builder = SiteBuilder(output_dir)
             success = builder.build_all()
             from web.database import SessionLocal
             from web.models import Article as ArticleModel

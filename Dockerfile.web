@@ -13,6 +13,7 @@ COPY web/ /app/web/
 COPY fetcher/ /app/fetcher/
 COPY shared/ /app/shared/
 COPY admin/ /app/admin/
+COPY database/ /app/database/
 
 ENV PYTHONPATH=/app
 

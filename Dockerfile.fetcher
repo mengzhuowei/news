@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir \
 COPY fetcher/ /app/fetcher/
 COPY web/ /app/web/
 COPY shared/ /app/shared/
+COPY database/ /app/database/
 
 ENV PYTHONPATH=/app
 

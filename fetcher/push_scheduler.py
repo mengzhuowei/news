@@ -202,6 +202,9 @@ class PushScheduler:
 async def main():
     """独立运行推送调度器"""
     import sys
+    from web.database import init_db
+
+    init_db()
 
     interval = int(os.getenv("PUSH_CHECK_INTERVAL", "60"))
     scheduler = PushScheduler(check_interval_seconds=interval)

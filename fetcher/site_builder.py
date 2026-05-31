@@ -1,7 +1,6 @@
-"""Jinja2 静态站点构建器 — 从数据库或 Markdown 文件生成静态 HTML"""
+"""Jinja2 静态站点构建器 — 从数据库生成静态 HTML"""
 
 import os
-import re
 import calendar
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -20,7 +19,7 @@ ARTICLES_PER_PAGE = 20
 
 
 class SiteBuilder:
-    """Jinja2 静态站点构建器 — 从数据库或 Markdown 文件生成静态 HTML"""
+    """Jinja2 静态站点构建器 — 从数据库生成静态 HTML"""
 
     def _refresh_config(self):
         self.site_title = os.getenv("SITE_TITLE", SITE_TITLE_DEFAULT)
@@ -33,12 +32,10 @@ class SiteBuilder:
                 "Set SITE_BASEURL for production deployments."
             )
 
-    def __init__(self, content_dir: str | Path, output_dir: str | Path,
-                 max_workers: int | None = None, use_db: bool = True):
-        self.content_dir = Path(content_dir)
+    def __init__(self, output_dir: str | Path,
+                 max_workers: int | None = None):
         self.output_dir = Path(output_dir)
         self.max_workers = max_workers or min(16, (os.cpu_count() or 4) + 2)
-        self.use_db = use_db
         self._refresh_config()
         self.env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(
@@ -109,54 +106,11 @@ class SiteBuilder:
             db.close()
         return sections
 
-    def _load_from_files(self) -> dict[str, list[dict]]:
-        """从 Markdown 文件读取文章（兼容旧数据）"""
-        sections: dict[str, list[dict]] = {}
-        if not self.content_dir.exists():
-            return sections
-
-        for category_dir in self.content_dir.iterdir():
-            if not category_dir.is_dir():
-                continue
-            category = category_dir.name
-            for md_file in sorted(category_dir.glob("*.md"), reverse=True):
-                text = md_file.read_text(encoding="utf-8")
-                title_match = re.search(r'^#\s+(.+)$', text, re.MULTILINE)
-                title = title_match.group(1) if title_match else md_file.stem
-                slug = md_file.stem
-                date = datetime.fromtimestamp(md_file.stat().st_mtime, tz=timezone.utc)
-
-                sections.setdefault(category, []).append({
-                    "title": title,
-                    "summary": "",
-                    "content": text,
-                    "content_html": markdown.markdown(
-                        text, extensions=["tables", "fenced_code"]
-                    ),
-                    "category": category,
-                    "source": "",
-                    "source_url": "",
-                    "author": "Unknown",
-                    "image": "",
-                    "date": date,
-                    "published_iso": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "published_display": (
-                        f"{calendar.month_name[date.month]} {date.day}, {date.year}"
-                    ),
-                    "permalink": f"{self._site_url}/{category}/{slug}/",
-                    "slug": slug,
-                    "section": category,
-                    "rewritten": False,
-                    "language": "en",
-                })
-
-        return sections
-
     def build_all(self) -> bool:
         try:
             self._refresh_config()
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            sections = self._load_from_db() if self.use_db else self._load_from_files()
+            sections = self._load_from_db()
 
             if not sections:
                 (self.output_dir / "index.html").write_text(
@@ -195,8 +149,7 @@ class SiteBuilder:
             self.build_rss(sections)
             self.build_robots_txt()
 
-            if self.use_db:
-                self._mark_articles_as_built(sections)
+            self._mark_articles_as_built(sections)
 
             return True
         except Exception as e:

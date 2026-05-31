@@ -1,20 +1,31 @@
 """FastAPI 主应用 — 静态站点 + API 服务"""
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 加载 .env 文件（必须在导入其他模块之前）
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 
+from web.database import init_db
 from web.routes import subscribe, subscription, admin, telegram_subscribe
 
-app = FastAPI(title="News Aggregator API")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    logger.info("[app] Initializing database...")
+    init_db()
+    logger.info("[app] Database initialization complete")
+    yield
+
+
+app = FastAPI(title="News Aggregator API", lifespan=lifespan)
 
 # CORS: 当 allow_credentials=True 时，allow_origins 不能用 "*"，否则浏览器会拒绝
 _cors_origins = os.getenv("CORS_ORIGINS", "").split(",")

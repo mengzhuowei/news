@@ -6,7 +6,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: news_aggregator
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./mysql_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "127.0.0.1:3306:3306"
@@ -40,7 +40,6 @@ services:
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
-      - ./shared-content:/app/shared-content
     networks:
       - news-network
 
@@ -107,9 +106,6 @@ services:
       - ARTICLES_PER_PUSH=${ARTICLES_PER_PUSH:-10}
     networks:
       - news-network
-
-volumes:
-  mysql_data:
 
 networks:
   news-network:

@@ -437,5 +437,7 @@ class NewsTelegramBot:
 
 
 if __name__ == "__main__":
+    from web.database import init_db
+    init_db()
     bot = NewsTelegramBot()
     bot.run()

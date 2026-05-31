@@ -185,13 +185,31 @@ class ContentEnricher:
         if not self.enabled:
             return articles
 
-        tasks = [self.enrich(a) for a in articles]
+        need_enrichment = [a for a in articles if self._needs_enrichment(a)]
+        skip_count = len(articles) - len(need_enrichment)
+        if skip_count > 0:
+            logger.info(f"[Enricher] {skip_count} articles already have full content, skipping")
+
+        if not need_enrichment:
+            return articles
+
+        logger.info(f"[Enricher] Enriching {len(need_enrichment)} articles (concurrency={self.max_concurrent})...")
+        completed = 0
+
+        async def _enrich_with_progress(article):
+            nonlocal completed
+            result = await self.enrich(article)
+            completed += 1
+            if completed % 50 == 0 or completed == len(need_enrichment):
+                logger.info(f"[Enricher] Progress: {completed}/{len(need_enrichment)}")
+            return result
+
+        tasks = [_enrich_with_progress(a) for a in need_enrichment]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        enriched = []
+        enriched_map = {}
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                enriched.append(articles[i])
-            else:
-                enriched.append(result)
-        return enriched
+            key = id(need_enrichment[i])
+            enriched_map[key] = need_enrichment[i] if isinstance(result, Exception) else result
+
+        return [enriched_map.get(id(a), a) for a in articles]
