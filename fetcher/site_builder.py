@@ -48,10 +48,13 @@ class SiteBuilder:
         )
 
     def _base_ctx(self, **extra) -> dict:
+        site_url = self.site_baseurl or f"https://{self.site_title.lower().replace(' ', '-')}.com"
         ctx = {
             "site_title": self.site_title,
             "site_baseurl": self.site_baseurl,
+            "site_url": site_url,
             "adsense_client_id": self.adsense_client_id,
+            "telegram_bot_username": self.telegram_bot_username,
         }
         ctx.update(extra)
         return ctx
@@ -140,6 +143,7 @@ class SiteBuilder:
                     "slug": slug,
                     "section": category,
                     "rewritten": False,
+                    "language": "en",
                 })
 
         return sections

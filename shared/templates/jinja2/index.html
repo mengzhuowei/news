@@ -3,7 +3,7 @@
 {% block head %}
 <meta property="og:title" content="{{ site_title }}">
 <meta property="og:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
-<meta property="og:url" content="{{ site_baseurl }}/">
+<meta property="og:url" content="{{ site_url }}/">
 <meta property="og:site_name" content="{{ site_title }}">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
@@ -14,7 +14,7 @@
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": {{ site_title | tojson }},
-    "url": "{{ site_baseurl }}/"
+    "url": "{{ site_url }}/"
 }
 </script>
 {% endblock %}
