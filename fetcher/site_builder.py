@@ -12,28 +12,34 @@ import jinja2
 import markdown
 from loguru import logger
 
-SITE_TITLE = os.getenv("SITE_TITLE", "Global News Digest")
-SITE_BASEURL = os.getenv("SITE_BASEURL", "")
-ADSENSE_CLIENT_ID = os.getenv("ADSENSE_CLIENT_ID", "")
-TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
+SITE_TITLE_DEFAULT = "Global News Digest"
+SITE_BASEURL_DEFAULT = ""
+ADSENSE_CLIENT_ID_DEFAULT = ""
+TELEGRAM_BOT_USERNAME_DEFAULT = ""
 ARTICLES_PER_PAGE = 20
 
 
 class SiteBuilder:
     """Jinja2 静态站点构建器 — 从数据库或 Markdown 文件生成静态 HTML"""
 
-    def __init__(self, content_dir: str | Path, output_dir: str | Path,
-                 max_workers: int | None = None, use_db: bool = True):
-        self.content_dir = Path(content_dir)
-        self.output_dir = Path(output_dir)
-        self.site_baseurl = SITE_BASEURL
+    def _refresh_config(self):
+        self.site_title = os.getenv("SITE_TITLE", SITE_TITLE_DEFAULT)
+        self.site_baseurl = os.getenv("SITE_BASEURL", SITE_BASEURL_DEFAULT)
+        self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
+        self.telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", TELEGRAM_BOT_USERNAME_DEFAULT)
         if not self.site_baseurl:
             logger.warning(
                 "SITE_BASEURL is empty; RSS and Sitemap will contain relative URLs. "
                 "Set SITE_BASEURL for production deployments."
             )
+
+    def __init__(self, content_dir: str | Path, output_dir: str | Path,
+                 max_workers: int | None = None, use_db: bool = True):
+        self.content_dir = Path(content_dir)
+        self.output_dir = Path(output_dir)
         self.max_workers = max_workers or min(16, (os.cpu_count() or 4) + 2)
         self.use_db = use_db
+        self._refresh_config()
         self.env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(
                 str(Path(__file__).parent.parent / "shared" / "templates" / "jinja2")
@@ -131,8 +137,8 @@ class SiteBuilder:
         return sections
 
     def build_all(self) -> bool:
-        """多线程构建完整站点"""
         try:
+            self._refresh_config()
             self.output_dir.mkdir(parents=True, exist_ok=True)
             sections = self._load_from_db() if self.use_db else self._load_from_files()
 
@@ -215,8 +221,8 @@ class SiteBuilder:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         ctx = {
-            "site_title": SITE_TITLE,
-            "adsense_client_id": ADSENSE_CLIENT_ID,
+            "site_title": self.site_title,
+            "adsense_client_id": self.adsense_client_id,
             "page": article,
             "title": article["title"],
             "permalink": article["permalink"],
@@ -241,8 +247,8 @@ class SiteBuilder:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         ctx = {
-            "site_title": SITE_TITLE,
-            "adsense_client_id": ADSENSE_CLIENT_ID,
+            "site_title": self.site_title,
+            "adsense_client_id": self.adsense_client_id,
             "section_name": section_name,
             "articles": page_articles,
             "page": page_num,
@@ -261,9 +267,9 @@ class SiteBuilder:
         )
         template = self.env.get_template("index.html")
         ctx = {
-            "site_title": SITE_TITLE,
-            "adsense_client_id": ADSENSE_CLIENT_ID,
-            "telegram_bot_username": TELEGRAM_BOT_USERNAME,
+            "site_title": self.site_title,
+            "adsense_client_id": self.adsense_client_id,
+            "telegram_bot_username": self.telegram_bot_username,
             "hero_article": all_articles[0] if all_articles else None,
             "hero_side_articles": all_articles[1:4],
             "latest_articles": all_articles[4:10],
@@ -312,9 +318,9 @@ class SiteBuilder:
         rss = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<rss version="2.0">\n<channel>\n'
-            f'  <title>{_escape_xml(SITE_TITLE)}</title>\n'
+            f'  <title>{_escape_xml(self.site_title)}</title>\n'
             f'  <link>{_escape_xml(self.site_baseurl)}/</link>\n'
-            f'  <description>{_escape_xml(SITE_TITLE)} - News Aggregator</description>\n'
+            f'  <description>{_escape_xml(self.site_title)} - News Aggregator</description>\n'
             f'{chr(10).join(items)}\n'
             '</channel>\n</rss>'
         )

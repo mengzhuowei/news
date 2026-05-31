@@ -31,12 +31,13 @@ services:
       - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL}
-      - LLM_MODEL=${LLM_MODEL:-gpt-3.5-turbo}
+      - LLM_MODEL=${LLM_MODEL}
       - CONTENT_ENRICHMENT=${CONTENT_ENRICHMENT:-false}
       - ENRICHMENT_CONCURRENT=${ENRICHMENT_CONCURRENT:-3}
       - UPDATE_INTERVAL=${UPDATE_INTERVAL:-15}
       - SITE_BASEURL=${SITE_BASEURL:-}
       - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
       - ./shared-content:/app/shared-content
@@ -66,6 +67,7 @@ services:
       - DIST_DIR=/app/dist
       - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
     networks:

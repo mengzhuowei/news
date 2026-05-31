@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -29,6 +30,9 @@ _CATEGORY_MAP = {
     "science": "science",
 }
 
+BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
+BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
+
 
 def make_slug(source: str, title: str, article_id: int = 0) -> str:
     """生成 URL 友好的 slug — 包含 article_id 保证唯一性"""
@@ -50,22 +54,21 @@ class FetchScheduler:
             enabled=os.getenv("CONTENT_ENRICHMENT", "true").lower() == "true",
             max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "3")),
         )
+        self._build_lock = threading.Lock()
+        self._last_build_at: Optional[datetime] = None
 
     async def fetch_and_process(self):
-        """完整抓取流程：抓取 → 充实 → 去重 → 清洗 → 洗稿 → 入库 → 清理 → 构建"""
+        """完整抓取流程：抓取 → 充实 → 去重 → 清洗 → 洗稿 → 入库(增量构建) → 清理 → 最终构建"""
         logger.info(f"[{datetime.now(timezone.utc)}] Starting scheduled fetch...")
 
-        # 每轮重置去重状态，防止跨周期内存无限增长
         self.cleaner._seen_hashes.clear()
         self.cleaner._seen_titles.clear()
 
         try:
-            # 1. 并发抓取（逐源记录 FetchLog）
             tasks = [self._fetch_source(f) for f in self.aggregator.fetchers]
             results = await asyncio.gather(*tasks)
             all_articles = [a for batch in results for a in batch]
 
-            # URL 精确去重
             seen_urls = set()
             articles = []
             for article in all_articles:
@@ -76,15 +79,12 @@ class FetchScheduler:
             if not articles:
                 return
 
-            # 2. 分类归一化
             for article in articles:
                 article.category = _CATEGORY_MAP.get(article.category, article.category)
 
-            # 3. 充实
             if self.enricher.enabled:
                 articles = await self.enricher.enrich_batch(articles)
 
-            # 4. 逐篇处理
             saved_count = 0
             for article in articles:
                 if await asyncio.to_thread(self._is_in_db, article.url):
@@ -94,7 +94,6 @@ class FetchScheduler:
                 if not cleaned:
                     continue
 
-                # AI 洗稿
                 if self.summarizer.api_key:
                     rewritten_content, rewritten_summary = await self.summarizer.rewrite(
                         cleaned.title, cleaned.content,
@@ -105,16 +104,16 @@ class FetchScheduler:
                 else:
                     cleaned.rewritten = False
 
-                # 统一添加版权声明（AI 重写前不附加，避免重复）
                 cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
 
                 await asyncio.to_thread(self._save_to_db, cleaned)
                 saved_count += 1
 
-            # 5. 清理过期
+                if saved_count % BUILD_BATCH_SIZE == 0:
+                    self._try_async_build(f"batch ({saved_count} saved)")
+
             await asyncio.to_thread(self._cleanup_expired_articles, 7)
 
-            # 6. 构建站点
             if saved_count > 0:
                 await asyncio.to_thread(self._build_static_site)
 
@@ -122,6 +121,42 @@ class FetchScheduler:
 
         except Exception as e:
             logger.error(f"Fetch error: {e}")
+
+    def _try_async_build(self, reason: str = ""):
+        """尝试在后台线程异步构建站点（带节流）"""
+        with self._build_lock:
+            now = datetime.now(timezone.utc)
+            if self._last_build_at and (now - self._last_build_at).total_seconds() < BUILD_COOLDOWN_SECONDS:
+                logger.debug(f"Build skipped (cooldown): {reason}")
+                return
+
+        thread = threading.Thread(target=self._async_build_worker, args=(reason,), daemon=True)
+        thread.start()
+
+    def _async_build_worker(self, reason: str):
+        """后台构建线程"""
+        with self._build_lock:
+            now = datetime.now(timezone.utc)
+            if self._last_build_at and (now - self._last_build_at).total_seconds() < BUILD_COOLDOWN_SECONDS:
+                return
+            self._last_build_at = now
+
+        try:
+            from fetcher.site_builder import SiteBuilder
+            project_root = Path(__file__).parent.parent
+            output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
+            builder = SiteBuilder(
+                content_dir=project_root / "shared-content",
+                output_dir=output_dir,
+                use_db=True,
+            )
+            success = builder.build_all()
+            if success:
+                logger.info(f"Async build succeeded ({reason})")
+            else:
+                logger.error(f"Async build failed ({reason})")
+        except Exception as e:
+            logger.error(f"Async build error ({reason}): {e}")
 
     async def shutdown(self):
         """清理所有资源（进程退出时调用）"""
@@ -202,7 +237,6 @@ class FetchScheduler:
             )
             db.add(record)
             db.commit()
-            # 使用分配的 ID 生成唯一 slug
             record.slug = make_slug(article.source, article.title, record.id)
             db.commit()
         except Exception as e:
@@ -266,6 +300,8 @@ class FetchScheduler:
             use_db=True,
         )
         success = builder.build_all()
+        with self._build_lock:
+            self._last_build_at = datetime.now(timezone.utc)
         if success:
             logger.info("Static site built successfully")
         else:

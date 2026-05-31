@@ -35,12 +35,14 @@
     </div>
 
     {% if page.image %}
-    <img src="{{ page.image }}" alt="{{ page.title }}" style="width: 100%; border-radius: 8px; margin-bottom: 1.5rem;">
+    <img src="{{ page.image }}" alt="{{ page.title }}" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
     {% endif %}
 
     {% if adsense_client_id %}
-    <ins class="adsbygoogle" style="display:block; margin-bottom: 1.5rem;" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
-    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    <div style="height:90px; overflow:hidden; margin-bottom: 0.75rem;">
+        <ins class="adsbygoogle" style="display:block" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="false"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    </div>
     {% endif %}
 
     <div class="content-body">
@@ -48,8 +50,8 @@
     </div>
 
     {% if adsense_client_id %}
-    <div style="margin-top: 2rem;">
-        <ins class="adsbygoogle" style="display:block;" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+    <div style="height:90px; overflow:hidden; margin-top: 2rem;">
+        <ins class="adsbygoogle" style="display:block" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="false"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
     </div>
     {% endif %}
