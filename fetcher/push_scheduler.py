@@ -18,6 +18,7 @@ class PushScheduler:
         self.check_interval = check_interval_seconds
         self.telegram_service = TelegramService()
         self.articles_per_push = int(os.getenv("ARTICLES_PER_PUSH", "10"))
+        self.site_baseurl = os.getenv("SITE_BASEURL", "").rstrip("/")
 
     async def run_continuously(self):
         """持续运行调度器"""
@@ -153,7 +154,7 @@ class PushScheduler:
                 {
                     "title": a.title,
                     "summary": a.summary,
-                    "url": a.url,
+                    "url": self._build_permalink(a),
                     "source": a.source,
                     "category": a.category,
                 }
@@ -161,6 +162,14 @@ class PushScheduler:
             ]
         finally:
             db.close()
+
+    def _build_permalink(self, article: Article) -> str:
+        """构建站内永久链接，回退到原始 URL"""
+        if self.site_baseurl:
+            category = article.category or "uncategorized"
+            slug = article.slug or f"article-{article.id}"
+            return f"{self.site_baseurl}/{category}/{slug}/"
+        return article.url
 
     def _update_last_pushed(self, subscription_id: int):
         """更新最后推送时间"""

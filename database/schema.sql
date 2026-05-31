@@ -35,17 +35,24 @@ CREATE TABLE IF NOT EXISTS articles (
 -- 订阅表
 CREATE TABLE IF NOT EXISTS subscriptions (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    email           VARCHAR(255)    NOT NULL UNIQUE,
+    email           VARCHAR(255)    DEFAULT NULL,
+    chat_id         BIGINT          DEFAULT NULL,
     is_active       BOOLEAN         DEFAULT TRUE,
     frequency       ENUM('daily', 'weekly') DEFAULT 'daily',
+    push_time       VARCHAR(8)      DEFAULT '09:00:00',
+    timezone        VARCHAR(50)     DEFAULT 'UTC',
+    push_channel    ENUM('telegram', 'email') DEFAULT 'telegram',
     site            VARCHAR(100)    DEFAULT NULL,
     categories      JSON            NULL,
     confirm_token   VARCHAR(64)     DEFAULT NULL,
     created_at      DATETIME        DEFAULT CURRENT_TIMESTAMP,
     confirmed_at    DATETIME        DEFAULT NULL,
+    last_pushed_at  DATETIME        DEFAULT NULL,
 
+    UNIQUE INDEX idx_chat_id_unique (chat_id),
     INDEX idx_email (email),
-    INDEX idx_token (confirm_token)
+    INDEX idx_token (confirm_token),
+    INDEX idx_push_time (push_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 抓取日志表

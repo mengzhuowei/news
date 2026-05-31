@@ -58,11 +58,17 @@ class SimHash:
 class ContentCleaner:
     """AI 内容清洗器 — 去重 + HTML 清洗 + 广告移除 + 截断 + 版权声明"""
 
+    _HASH_BITS = 64
+    _BUCKET_BITS = 10
+    _BUCKET_COUNT = 1 << _BUCKET_BITS
+    _BUCKET_MASK = _BUCKET_COUNT - 1
+
     def __init__(self, duplicate_threshold: float = 0.8):
         self.duplicate_threshold = duplicate_threshold
         self.simhash = SimHash()
         self._seen_hashes: Set[int] = set()
         self._seen_titles: Set[str] = set()
+        self._hash_buckets: dict[int, list[int]] = {}
 
     def clean(self, article: Article) -> Optional[Article]:
         """清洗文章，重复则返回 None"""
@@ -78,7 +84,7 @@ class ContentCleaner:
             article.summary = self._normalize_text(article.summary)
 
             article_hash = self.simhash.compute(article.title + article.content)
-            self._seen_hashes.add(article_hash)
+            self._add_hash(article_hash)
             self._seen_titles.add(article.title.lower())
 
             article.content = self._truncate_content(article.content, max_length=5000)
@@ -89,7 +95,7 @@ class ContentCleaner:
             return None
 
     def _is_duplicate(self, article: Article) -> bool:
-        """三级去重：标题匹配 → SimHash 精确匹配 → SimHash 模糊匹配"""
+        """三级去重：标题匹配 → SimHash 精确匹配 → SimHash 桶内模糊匹配"""
         if article.title.lower() in self._seen_titles:
             return True
 
@@ -100,11 +106,19 @@ class ContentCleaner:
 
         if article_hash in self._seen_hashes:
             return True
-        for seen_hash in self._seen_hashes:
+
+        bucket_key = article_hash & self._BUCKET_MASK
+        for seen_hash in self._hash_buckets.get(bucket_key, []):
             distance = self.simhash.hamming_distance(article_hash, seen_hash)
             if 1 - (distance / self.simhash.hash_bits) >= self.duplicate_threshold:
                 return True
         return False
+
+    def _add_hash(self, article_hash: int):
+        """记录 hash 到精确集合和分桶索引"""
+        self._seen_hashes.add(article_hash)
+        bucket_key = article_hash & self._BUCKET_MASK
+        self._hash_buckets.setdefault(bucket_key, []).append(article_hash)
 
     def _remove_html_tags(self, text: str) -> str:
         text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)

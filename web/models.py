@@ -12,7 +12,7 @@ Base = declarative_base()
 class Article(Base):
     __tablename__ = 'articles'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     url = Column(String(768), unique=True, nullable=False)
     title = Column(String(1024), nullable=False)
     summary = Column(Text, default='')
@@ -31,7 +31,7 @@ class Article(Base):
 class Subscription(Base):
     __tablename__ = 'subscriptions'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     email = Column(String(255), nullable=True)  # Telegram 订阅时可选
     chat_id = Column(BigInteger, unique=True, nullable=True)  # Telegram chat_id
     is_active = Column(Boolean, default=True)
@@ -50,7 +50,7 @@ class Subscription(Base):
 class EmailLog(Base):
     __tablename__ = 'email_logs'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     subscription_id = Column(BigInteger, ForeignKey('subscriptions.id', ondelete='SET NULL'))
     email_type = Column(Enum('confirmation', 'welcome', 'digest', 'unsubscribe'), nullable=False)
     status = Column(Enum('sent', 'failed', 'bounced'), default='sent')
@@ -60,7 +60,7 @@ class EmailLog(Base):
 class FetchLog(Base):
     __tablename__ = 'fetch_logs'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     source = Column(String(255), nullable=False)
     articles_count = Column(Integer, default=0)
     status = Column(Enum('success', 'failed', 'partial'), default='success')

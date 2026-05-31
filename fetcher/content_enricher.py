@@ -195,13 +195,16 @@ class ContentEnricher:
 
         logger.info(f"[Enricher] Enriching {len(need_enrichment)} articles (concurrency={self.max_concurrent})...")
         completed = 0
+        count_lock = asyncio.Lock()
 
         async def _enrich_with_progress(article):
             nonlocal completed
             result = await self.enrich(article)
-            completed += 1
-            if completed % 50 == 0 or completed == len(need_enrichment):
-                logger.info(f"[Enricher] Progress: {completed}/{len(need_enrichment)}")
+            async with count_lock:
+                completed += 1
+                current = completed
+            if current % 50 == 0 or current == len(need_enrichment):
+                logger.info(f"[Enricher] Progress: {current}/{len(need_enrichment)}")
             return result
 
         tasks = [_enrich_with_progress(a) for a in need_enrichment]

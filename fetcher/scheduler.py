@@ -56,6 +56,7 @@ class FetchScheduler:
             max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "5")),
         )
         self._build_lock = threading.Lock()
+        self._build_run_lock = threading.Lock()
         self._last_build_at: Optional[datetime] = None
 
     async def fetch_and_process(self):
@@ -64,6 +65,7 @@ class FetchScheduler:
 
         self.cleaner._seen_hashes.clear()
         self.cleaner._seen_titles.clear()
+        self.cleaner._hash_buckets.clear()
 
         try:
             tasks = [self._fetch_source(f) for f in self.aggregator.fetchers]
@@ -107,11 +109,10 @@ class FetchScheduler:
                         continue
                     cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
                     cleaned.rewritten = False
-                    await asyncio.to_thread(self._save_to_db, cleaned)
-                    saved_count += 1
-
-                if saved_count % BUILD_BATCH_SIZE == 0:
-                    self._try_async_build(f"batch ({saved_count} saved)")
+                    if await asyncio.to_thread(self._save_to_db, cleaned):
+                        saved_count += 1
+                    if saved_count > 0 and saved_count % BUILD_BATCH_SIZE == 0:
+                        self._try_async_build(f"batch ({saved_count} saved)")
 
             await asyncio.to_thread(self._cleanup_expired_articles, 7)
 
@@ -127,6 +128,7 @@ class FetchScheduler:
         """并发洗稿 + 入库流水线"""
         semaphore = asyncio.Semaphore(REWRITE_CONCURRENT)
         saved_count = 0
+        count_lock = asyncio.Lock()
 
         async def _process_one(article):
             nonlocal saved_count
@@ -144,12 +146,17 @@ class FetchScheduler:
             cleaned.rewritten = True
             cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
 
-            await asyncio.to_thread(self._save_to_db, cleaned)
-            saved_count += 1
+            saved = await asyncio.to_thread(self._save_to_db, cleaned)
+            if not saved:
+                return
 
-            if saved_count % BUILD_BATCH_SIZE == 0:
-                self._try_async_build(f"batch ({saved_count} saved)")
-                logger.info(f"Progress: {saved_count} articles saved")
+            async with count_lock:
+                saved_count += 1
+                current_count = saved_count
+
+            if current_count % BUILD_BATCH_SIZE == 0:
+                self._try_async_build(f"batch ({current_count} saved)")
+                logger.info(f"Progress: {current_count} articles saved")
 
         tasks = [_process_one(a) for a in articles]
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -192,6 +199,10 @@ class FetchScheduler:
                 return
             self._last_build_at = now
 
+        if not self._build_run_lock.acquire(blocking=False):
+            logger.debug(f"Build skipped (another build in progress): {reason}")
+            return
+
         try:
             from fetcher.site_builder import SiteBuilder
             project_root = Path(__file__).parent.parent
@@ -206,6 +217,8 @@ class FetchScheduler:
                 logger.error(f"Async build failed ({reason})")
         except Exception as e:
             logger.error(f"Async build error ({reason}): {e}")
+        finally:
+            self._build_run_lock.release()
 
     async def shutdown(self):
         """清理所有资源（进程退出时调用）"""
@@ -263,15 +276,15 @@ class FetchScheduler:
         finally:
             db.close()
 
-    def _save_to_db(self, article):
-        """保存文章到数据库"""
+    def _save_to_db(self, article) -> bool:
+        """保存文章到数据库，返回是否成功"""
         from web.database import SessionLocal
         from web.models import Article as ArticleModel
 
         db = SessionLocal()
         try:
             if db.query(ArticleModel).filter(ArticleModel.url == article.url).first():
-                return
+                return False
             record = ArticleModel(
                 url=article.url,
                 title=article.title,
@@ -288,9 +301,11 @@ class FetchScheduler:
             db.commit()
             record.slug = make_slug(article.source, article.title, record.id)
             db.commit()
+            return True
         except Exception as e:
             db.rollback()
             logger.error(f"DB save error: {e}")
+            return False
         finally:
             db.close()
 
@@ -320,21 +335,22 @@ class FetchScheduler:
             db.close()
 
     def _build_static_site(self):
-        """构建静态站点"""
+        """构建静态站点（等待正在进行的构建完成后再执行）"""
         from fetcher.site_builder import SiteBuilder
 
-        project_root = Path(__file__).parent.parent
-        output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
-        builder = SiteBuilder(
-            output_dir=output_dir,
-        )
-        success = builder.build_all()
-        with self._build_lock:
-            self._last_build_at = datetime.now(timezone.utc)
-        if success:
-            logger.info("Static site built successfully")
-        else:
-            logger.error("Failed to build static site")
+        with self._build_run_lock:
+            project_root = Path(__file__).parent.parent
+            output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
+            builder = SiteBuilder(
+                output_dir=output_dir,
+            )
+            success = builder.build_all()
+            with self._build_lock:
+                self._last_build_at = datetime.now(timezone.utc)
+            if success:
+                logger.info("Static site built successfully")
+            else:
+                logger.error("Failed to build static site")
 
     async def run_continuously(self):
         """持续运行调度器"""
