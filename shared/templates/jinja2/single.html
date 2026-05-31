@@ -6,12 +6,21 @@
 {% block head %}
 <meta property="og:title" content="{{ page.title }}">
 <meta property="og:description" content="{{ page.summary[:160] }}">
+<meta property="og:url" content="{{ permalink }}">
+<meta property="og:site_name" content="{{ site_title }}">
 {% if page.image %}
 <meta property="og:image" content="{{ page.image }}">
 {% endif %}
 <meta property="og:type" content="article">
 <meta property="article:published_time" content="{{ page.published_iso }}">
 <meta property="article:author" content="{{ page.author }}">
+<meta property="article:section" content="{{ page.category }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ page.title }}">
+<meta name="twitter:description" content="{{ page.summary[:160] }}">
+{% if page.image %}
+<meta name="twitter:image" content="{{ page.image }}">
+{% endif %}
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -23,9 +32,25 @@
     {% if page.image %},"image": {{ page.image | tojson }}{% endif %}
 }
 </script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_baseurl }}/"},
+        {"@type": "ListItem", "position": 2, "name": {{ page.category | capitalize | tojson }}, "item": "{{ site_baseurl }}/{{ page.category }}/"},
+        {"@type": "ListItem", "position": 3, "name": {{ page.title | tojson }}}
+    ]
+}
+</script>
 {% endblock %}
 
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span>›</span>
+    <a href="/{{ page.category }}/">{{ page.category | capitalize }}</a><span>›</span>
+    <span>{{ page.title }}</span>
+</nav>
 <article class="article-content">
     <span class="source-badge">{{ page.source }}</span>
     <h1>{{ page.title }}</h1>
@@ -35,7 +60,7 @@
     </div>
 
     {% if page.image %}
-    <img src="{{ page.image }}" alt="{{ page.title }}" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
+    <img src="{{ page.image }}" alt="{{ page.title }}" width="800" height="400" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
     {% endif %}
 
     {% if adsense_client_id %}

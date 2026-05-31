@@ -1,12 +1,31 @@
 {% extends "base.html" %}
 
+{% block head %}
+<meta property="og:title" content="{{ site_title }}">
+<meta property="og:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
+<meta property="og:url" content="{{ site_baseurl }}/">
+<meta property="og:site_name" content="{{ site_title }}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ site_title }}">
+<meta name="twitter:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": {{ site_title | tojson }},
+    "url": "{{ site_baseurl }}/"
+}
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="grid">
     <div>
         {% if hero_article %}
         <div class="hero">
             {% if hero_article.image %}
-            <img src="{{ hero_article.image }}" alt="{{ hero_article.title }}">
+            <img src="{{ hero_article.image }}" alt="{{ hero_article.title }}" width="800" height="300">
             {% endif %}
             <div class="hero-content">
                 <span class="source-badge">{{ hero_article.source }}</span>
@@ -49,7 +68,7 @@
             <h3>📬 Subscribe</h3>
             <p>Get daily news digests via Telegram</p>
             {% if telegram_bot_username %}
-            <a href="https://t.me/{{ telegram_bot_username }}" class="subscribe-btn" target="_blank">
+            <a href="https://t.me/{{ telegram_bot_username }}" class="subscribe-btn" target="_blank" rel="noopener">
                 Open Telegram Bot
             </a>
             {% else %}

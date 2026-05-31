@@ -47,6 +47,15 @@ class SiteBuilder:
             autoescape=jinja2.select_autoescape(["html"]),
         )
 
+    def _base_ctx(self, **extra) -> dict:
+        ctx = {
+            "site_title": self.site_title,
+            "site_baseurl": self.site_baseurl,
+            "adsense_client_id": self.adsense_client_id,
+        }
+        ctx.update(extra)
+        return ctx
+
     def _load_from_db(self) -> dict[str, list[dict]]:
         """从数据库读取文章，按分类组织"""
         from web.database import SessionLocal
@@ -60,7 +69,6 @@ class SiteBuilder:
                 category = a.category or "uncategorized"
                 slug = a.slug or f"article-{a.id}"
                 date = a.published_at or a.created_at or datetime.now(timezone.utc)
-                # MySQL DATETIME 列返回 naive datetime，确保转为 aware
                 if date.tzinfo is None:
                     date = date.replace(tzinfo=timezone.utc)
 
@@ -148,7 +156,6 @@ class SiteBuilder:
                 )
                 return True
 
-            # 多线程渲染
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for section_name, articles in sections.items():
@@ -175,12 +182,11 @@ class SiteBuilder:
                     except Exception as e:
                         logger.error(f"Thread error: {e}")
 
-            # 顺序构建首页、Sitemap、RSS
             self.build_homepage(sections)
             self.build_sitemap(sections)
             self.build_rss(sections)
+            self.build_robots_txt()
 
-            # 标记文章为已构建
             if self.use_db:
                 self._mark_articles_as_built(sections)
 
@@ -220,14 +226,14 @@ class SiteBuilder:
         out_dir = self.output_dir / section_name / article["slug"]
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        ctx = {
-            "site_title": self.site_title,
-            "adsense_client_id": self.adsense_client_id,
-            "page": article,
-            "title": article["title"],
-            "permalink": article["permalink"],
-            "sections": {k: {"count": len(v)} for k, v in sections.items()},
-        }
+        ctx = self._base_ctx(
+            page=article,
+            title=article["title"],
+            permalink=article["permalink"],
+            canonical_url=article["permalink"],
+            page_lang=article.get("language", "en"),
+            sections={k: {"count": len(v)} for k, v in sections.items()},
+        )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
 
     def _render_section_page(
@@ -246,17 +252,30 @@ class SiteBuilder:
             out_dir = self.output_dir / section_name / "page" / str(page_num)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        ctx = {
-            "site_title": self.site_title,
-            "adsense_client_id": self.adsense_client_id,
-            "section_name": section_name,
-            "articles": page_articles,
-            "page": page_num,
-            "total_pages": total_pages,
-            "has_prev": page_num > 1,
-            "has_next": page_num < total_pages,
-            "sections": {k: {"count": len(v)} for k, v in sections.items()},
-        }
+        canonical_url = f"{self.site_baseurl}/{section_name}/"
+        if page_num > 1:
+            canonical_url = f"{self.site_baseurl}/{section_name}/page/{page_num}/"
+
+        prev_url = None
+        if page_num > 1:
+            prev_url = f"/{section_name}/" if page_num == 2 else f"/{section_name}/page/{page_num - 1}/"
+
+        next_url = None
+        if page_num < total_pages:
+            next_url = f"/{section_name}/page/{page_num + 1}/"
+
+        ctx = self._base_ctx(
+            section_name=section_name,
+            articles=page_articles,
+            page=page_num,
+            total_pages=total_pages,
+            has_prev=page_num > 1,
+            has_next=page_num < total_pages,
+            canonical_url=canonical_url,
+            prev_url=prev_url,
+            next_url=next_url,
+            sections={k: {"count": len(v)} for k, v in sections.items()},
+        )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
 
     def build_homepage(self, sections: dict):
@@ -266,28 +285,44 @@ class SiteBuilder:
             key=lambda a: a["date"], reverse=True,
         )
         template = self.env.get_template("index.html")
-        ctx = {
-            "site_title": self.site_title,
-            "adsense_client_id": self.adsense_client_id,
-            "telegram_bot_username": self.telegram_bot_username,
-            "hero_article": all_articles[0] if all_articles else None,
-            "hero_side_articles": all_articles[1:4],
-            "latest_articles": all_articles[4:10],
-            "sections": {k: {"count": len(v)} for k, v in sections.items()},
-        }
+        ctx = self._base_ctx(
+            telegram_bot_username=self.telegram_bot_username,
+            hero_article=all_articles[0] if all_articles else None,
+            hero_side_articles=all_articles[1:4],
+            latest_articles=all_articles[4:10],
+            canonical_url=f"{self.site_baseurl}/",
+            sections={k: {"count": len(v)} for k, v in sections.items()},
+        )
         (self.output_dir / "index.html").write_text(
             template.render(**ctx), encoding="utf-8"
         )
 
     def build_sitemap(self, sections: dict):
-        """生成 sitemap.xml"""
+        """生成 sitemap.xml — 包含首页、分类页和文章页"""
         urlset = Element("urlset")
         urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
-        for articles in sections.values():
+
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        home_el = SubElement(urlset, "url")
+        SubElement(home_el, "loc").text = f"{self.site_baseurl}/"
+        SubElement(home_el, "lastmod").text = now_iso
+        SubElement(home_el, "changefreq").text = "hourly"
+        SubElement(home_el, "priority").text = "1.0"
+
+        for section_name, articles in sections.items():
+            cat_el = SubElement(urlset, "url")
+            SubElement(cat_el, "loc").text = f"{self.site_baseurl}/{section_name}/"
+            SubElement(cat_el, "lastmod").text = articles[0]["published_iso"] if articles else now_iso
+            SubElement(cat_el, "changefreq").text = "hourly"
+            SubElement(cat_el, "priority").text = "0.8"
+
             for article in articles:
                 url_el = SubElement(urlset, "url")
                 SubElement(url_el, "loc").text = article["permalink"]
                 SubElement(url_el, "lastmod").text = article["published_iso"]
+                SubElement(url_el, "changefreq").text = "daily"
+                SubElement(url_el, "priority").text = "0.6"
 
         xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
             urlset, encoding="unicode"
@@ -325,6 +360,16 @@ class SiteBuilder:
             '</channel>\n</rss>'
         )
         (self.output_dir / "index.xml").write_text(rss, encoding="utf-8")
+
+    def build_robots_txt(self):
+        """生成 robots.txt"""
+        sitemap_url = f"{self.site_baseurl}/sitemap.xml" if self.site_baseurl else "/sitemap.xml"
+        content = (
+            "User-agent: *\n"
+            "Allow: /\n"
+            f"Sitemap: {sitemap_url}\n"
+        )
+        (self.output_dir / "robots.txt").write_text(content, encoding="utf-8")
 
 
 def _escape_xml(text: str) -> str:

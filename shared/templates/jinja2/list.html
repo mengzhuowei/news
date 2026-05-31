@@ -1,8 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}{{ section_name }} - {{ site_title }}{% endblock %}
+{% block title %}{{ section_name | capitalize }} News - {{ site_title }}{% endblock %}
+{% block description %}Latest {{ section_name }} news from BBC, Reuters, Bloomberg and more. Stay updated with the top {{ section_name }} stories.{% endblock %}
+
+{% block head %}
+<meta property="og:title" content="{{ section_name | capitalize }} News - {{ site_title }}">
+<meta property="og:description" content="Latest {{ section_name }} news from BBC, Reuters, Bloomberg and more.">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="{{ site_title }}">
+<meta property="og:type" content="website">
+{% if has_prev %}
+<link rel="prev" href="{{ prev_url }}">
+{% endif %}
+{% if has_next %}
+<link rel="next" href="{{ next_url }}">
+{% endif %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_baseurl }}/"},
+        {"@type": "ListItem", "position": 2, "name": {{ section_name | capitalize | tojson }}, "item": "{{ site_baseurl }}/{{ section_name }}/"}
+    ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span>›</span>
+    <span>{{ section_name | capitalize }}</span>
+</nav>
 <h2 style="margin-bottom: 1.5rem; text-transform: capitalize;">{{ section_name }}</h2>
 
 {% for article in articles %}
@@ -29,9 +58,9 @@
         {% if p == page %}
             <span>{{ p }}</span>
         {% elif p == 1 %}
-            <a href="/{{ section_name }}/">{{ p }}</a>
+        <a href="/{{ section_name }}/">{{ p }}</a>
         {% else %}
-            <a href="/{{ section_name }}/page/{{ p }}/">{{ p }}</a>
+        <a href="/{{ section_name }}/page/{{ p }}/">{{ p }}</a>
         {% endif %}
     {% endfor %}
 
