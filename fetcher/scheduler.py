@@ -12,6 +12,23 @@ from fetcher.cleaner import ContentCleaner
 from fetcher.summarizer import Summarizer
 from fetcher.content_enricher import ContentEnricher
 
+_CATEGORY_MAP = {
+    "technology": "technology",
+    "artificial-intelligence": "technology",
+    "machine-learning": "technology",
+    "nlp": "technology",
+    "computer-vision": "technology",
+    "research": "technology",
+    "business": "business",
+    "markets": "business",
+    "finance": "business",
+    "economics": "business",
+    "world": "world",
+    "politics": "world",
+    "news": "world",
+    "science": "science",
+}
+
 
 def make_slug(source: str, title: str, article_id: int = 0) -> str:
     """生成 URL 友好的 slug — 包含 article_id 保证唯一性"""
@@ -59,11 +76,15 @@ class FetchScheduler:
             if not articles:
                 return
 
-            # 2. 充实
+            # 2. 分类归一化
+            for article in articles:
+                article.category = _CATEGORY_MAP.get(article.category, article.category)
+
+            # 3. 充实
             if self.enricher.enabled:
                 articles = await self.enricher.enrich_batch(articles)
 
-            # 3. 逐篇处理
+            # 4. 逐篇处理
             saved_count = 0
             for article in articles:
                 if await asyncio.to_thread(self._is_in_db, article.url):
@@ -90,10 +111,10 @@ class FetchScheduler:
                 await asyncio.to_thread(self._save_to_db, cleaned)
                 saved_count += 1
 
-            # 4. 清理过期
+            # 5. 清理过期
             await asyncio.to_thread(self._cleanup_expired_articles, 7)
 
-            # 5. 构建站点
+            # 6. 构建站点
             if saved_count > 0:
                 await asyncio.to_thread(self._build_static_site)
 
