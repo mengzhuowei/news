@@ -26,7 +26,14 @@ PROJECT_ROOT = Path(__file__).parent.parent
 SCHEMA_SQL_PATH = PROJECT_ROOT / "database" / "schema.sql"
 MIGRATIONS_DIR = PROJECT_ROOT / "database" / "migrations"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False, pool_pre_ping=True)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
+    pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 from web.models import Base  # noqa: E402
@@ -45,6 +52,23 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def get_session():
+    """线程安全的数据库 session 上下文管理器 — 自动 commit/rollback/close"""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

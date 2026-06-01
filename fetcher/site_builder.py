@@ -62,12 +62,11 @@ class SiteBuilder:
 
     def _load_from_db(self) -> dict[str, list[dict]]:
         """从数据库读取文章，按分类组织"""
-        from web.database import SessionLocal
+        from web.database import get_session
         from web.models import Article
 
         sections: dict[str, list[dict]] = {}
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             articles = db.query(Article).order_by(Article.published_at.desc()).all()
             for a in articles:
                 category = a.category or "uncategorized"
@@ -104,8 +103,6 @@ class SiteBuilder:
 
             for cat in sections:
                 sections[cat].sort(key=lambda a: a["date"], reverse=True)
-        finally:
-            db.close()
         return sections
 
     def build_all(self) -> bool:
@@ -160,28 +157,26 @@ class SiteBuilder:
 
     def _mark_articles_as_built(self, sections: dict[str, list[dict]]):
         """标记所有文章为已构建 — 使用 ID 而非 slug 防止碰撞误更新"""
-        from web.database import SessionLocal
+        from web.database import get_session
         from web.models import Article
 
-        db = SessionLocal()
-        try:
-            article_ids = []
-            for articles in sections.values():
-                for article in articles:
-                    if article.get("id"):
-                        article_ids.append(article["id"])
+        article_ids = []
+        for articles in sections.values():
+            for article in articles:
+                if article.get("id"):
+                    article_ids.append(article["id"])
 
-            if article_ids:
+        if not article_ids:
+            return
+
+        try:
+            with get_session() as db:
                 db.query(Article).filter(Article.id.in_(article_ids)).update(
                     {"is_built": True}, synchronize_session=False
                 )
-                db.commit()
-                logger.info(f"Marked {len(article_ids)} articles as built")
+            logger.info(f"Marked {len(article_ids)} articles as built")
         except Exception as e:
-            db.rollback()
             logger.error(f"Failed to mark articles as built: {e}")
-        finally:
-            db.close()
 
     def _render_article_page(self, section_name: str, article: dict, sections: dict):
         """渲染单篇文章页"""

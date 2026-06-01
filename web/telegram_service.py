@@ -126,8 +126,8 @@ class TelegramService:
             return False
 
         date_str = datetime.now().strftime("%B %d, %Y")
-        title = "Daily" if frequency == "daily" else "Weekly"
-        message = f"📰 <b>{title} News Digest</b>\n<i>{date_str}</i>\n\n"
+        digest_title = "Daily" if frequency == "daily" else "Weekly"
+        message = f"📰 <b>{digest_title} News Digest</b>\n<i>{date_str}</i>\n\n"
 
         for i, article in enumerate(articles[:10], 1):
             source = article.get("source", "")

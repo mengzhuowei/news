@@ -2,6 +2,8 @@
 
 import os
 import secrets
+import threading
+import time
 from datetime import datetime, timezone
 from loguru import logger
 
@@ -18,7 +20,7 @@ except ImportError:
     TELEGRAM_BOT_AVAILABLE = False
     logger.warning("[TelegramBot] python-telegram-bot not installed. Bot commands disabled.")
 
-from web.database import SessionLocal
+from web.database import get_session
 from web.models import Subscription
 from web.telegram_service import TelegramService, _escape_html
 
@@ -39,7 +41,42 @@ CATEGORY_ICONS = {
     "startups": "🚀",
 }
 
-_pending_selections: dict[int, list[str]] = {}
+_PENDING_TTL = 600
+
+class _TTLCache:
+    """线程安全的 TTL 缓存 — 自动清理过期的临时选择状态"""
+
+    def __init__(self, ttl: int = _PENDING_TTL):
+        self._ttl = ttl
+        self._data: dict[int, tuple[list[str], float]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: int) -> list[str]:
+        with self._lock:
+            entry = self._data.get(key)
+            if entry is None:
+                return []
+            value, ts = entry
+            if time.monotonic() - ts > self._ttl:
+                del self._data[key]
+                return []
+            return list(value)
+
+    def set(self, key: int, value: list[str]):
+        with self._lock:
+            self._data[key] = (value, time.monotonic())
+
+    def pop(self, key: int) -> list[str]:
+        with self._lock:
+            entry = self._data.pop(key, None)
+            if entry is None:
+                return []
+            value, ts = entry
+            if time.monotonic() - ts > self._ttl:
+                return []
+            return list(value)
+
+_pending_selections = _TTLCache()
 
 COMMON_TIMEZONES = [
     "America/New_York",
@@ -128,8 +165,7 @@ class NewsTelegramBot:
         chat_id = update.effective_chat.id
         user = update.effective_user
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -151,7 +187,7 @@ class NewsTelegramBot:
                         reply_markup=InlineKeyboardMarkup(keyboard),
                     )
             else:
-                _pending_selections[chat_id] = []
+                _pending_selections.set(chat_id, [])
                 await update.message.reply_text(
                     f"👋 Hello, {user.first_name}!\n\n"
                     "I'm a news aggregator bot that sends you daily news digests.\n\n"
@@ -162,14 +198,11 @@ class NewsTelegramBot:
                     ),
                     parse_mode="HTML",
                 )
-        finally:
-            db.close()
 
     async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -182,17 +215,13 @@ class NewsTelegramBot:
                 return
 
             subscription.is_active = False
-            db.commit()
 
             await self.service.send_unsubscribe_confirm(chat_id)
-        finally:
-            db.close()
 
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -218,8 +247,6 @@ class NewsTelegramBot:
             )
 
             await update.message.reply_text(text, parse_mode="HTML")
-        finally:
-            db.close()
 
     async def settime(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
@@ -249,8 +276,7 @@ class NewsTelegramBot:
             )
             return
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -263,20 +289,16 @@ class NewsTelegramBot:
                 return
 
             subscription.push_time = f"{time_str}:00"
-            db.commit()
 
             await update.message.reply_text(
                 f"✅ Push time set to <b>{time_str}</b>",
                 parse_mode="HTML",
             )
-        finally:
-            db.close()
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -296,8 +318,6 @@ class NewsTelegramBot:
                 reply_markup=_build_category_keyboard(current_cats),
                 parse_mode="HTML",
             )
-        finally:
-            db.close()
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -319,7 +339,7 @@ class NewsTelegramBot:
 
     async def _handle_subscribe_callback(self, query, chat_id: int, data: str):
         if data == "sub_done":
-            selected = _pending_selections.get(chat_id, [])
+            selected = _pending_selections.get(chat_id)
             cats_display = ", ".join(selected) if selected else "all categories"
             await query.edit_message_text(
                 f"📂 Categories selected: <i>{cats_display}</i>\n\n"
@@ -331,12 +351,12 @@ class NewsTelegramBot:
 
         category = data[4:]
 
-        selected = _pending_selections.get(chat_id, [])
+        selected = _pending_selections.get(chat_id)
         if category in selected:
             selected.remove(category)
         else:
             selected.append(category)
-        _pending_selections[chat_id] = selected
+        _pending_selections.set(chat_id, selected)
 
         await query.edit_message_reply_markup(
             _build_category_keyboard(
@@ -346,10 +366,9 @@ class NewsTelegramBot:
         )
 
     async def _handle_subscribe_confirm(self, query, chat_id: int):
-        selected = _pending_selections.pop(chat_id, [])
+        selected = _pending_selections.pop(chat_id)
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             existing = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -361,7 +380,6 @@ class NewsTelegramBot:
                 existing.is_active = True
                 existing.categories = selected
                 existing.confirmed_at = datetime.now(timezone.utc)
-                db.commit()
             else:
                 subscription = Subscription(
                     chat_id=chat_id,
@@ -374,7 +392,6 @@ class NewsTelegramBot:
                     confirmed_at=datetime.now(timezone.utc),
                 )
                 db.add(subscription)
-                db.commit()
 
             cats_display = ", ".join(_escape_html(c) for c in selected) if selected else "all categories"
             await query.edit_message_text(
@@ -387,15 +404,12 @@ class NewsTelegramBot:
                 "/stop - Unsubscribe",
                 parse_mode="HTML",
             )
-        finally:
-            db.close()
 
     async def _handle_timezone_callback(self, query, chat_id: int, data: str):
         timezone = data[3:]
-        selected = _pending_selections.pop(chat_id, [])
+        selected = _pending_selections.pop(chat_id)
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             existing = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -408,7 +422,6 @@ class NewsTelegramBot:
                 existing.categories = selected
                 existing.timezone = timezone
                 existing.confirmed_at = datetime.now(timezone.utc)
-                db.commit()
             else:
                 subscription = Subscription(
                     chat_id=chat_id,
@@ -421,7 +434,6 @@ class NewsTelegramBot:
                     confirmed_at=datetime.now(timezone.utc),
                 )
                 db.add(subscription)
-                db.commit()
 
             cats_display = ", ".join(_escape_html(c) for c in selected) if selected else "all categories"
             tz_display = timezone.replace("_", " ")
@@ -436,12 +448,9 @@ class NewsTelegramBot:
                 "/stop - Unsubscribe",
                 parse_mode="HTML",
             )
-        finally:
-            db.close()
 
     async def _handle_reactivate_callback(self, query, chat_id: int):
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -451,12 +460,9 @@ class NewsTelegramBot:
                 return
 
             subscription.is_active = True
-            db.commit()
 
             await query.edit_message_text("🎉 Subscription reactivated!")
             await self.service.send_welcome(chat_id, subscription.categories or [])
-        finally:
-            db.close()
 
     async def _handle_category_callback(self, query, chat_id: int, data: str):
         if data == "cat_done":
@@ -465,8 +471,7 @@ class NewsTelegramBot:
 
         category = data[4:]
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.chat_id == chat_id
             ).first()
@@ -482,19 +487,15 @@ class NewsTelegramBot:
                 current_cats.append(category)
 
             subscription.categories = current_cats
-            db.commit()
 
             await query.edit_message_reply_markup(
                 _build_category_keyboard(current_cats)
             )
-        finally:
-            db.close()
 
     async def _handle_confirm_callback(self, query, chat_id: int, data: str):
         token = data[8:]
 
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             subscription = db.query(Subscription).filter(
                 Subscription.confirm_token == token
             ).first()
@@ -510,12 +511,9 @@ class NewsTelegramBot:
             subscription.confirmed_at = datetime.now(timezone.utc)
             subscription.is_active = True
             subscription.chat_id = chat_id
-            db.commit()
 
             await query.edit_message_text("✅ Subscription confirmed!")
             await self.service.send_welcome(chat_id, subscription.categories or [])
-        finally:
-            db.close()
 
     def run(self):
         if not self.app:

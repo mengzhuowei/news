@@ -1,9 +1,17 @@
 """邮件发送服务 — 基于 SendGrid"""
 
+import asyncio
 import html as html_module
 import os
 from typing import Optional, List
 from loguru import logger
+
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
 
 
 class EmailService:
@@ -12,14 +20,16 @@ class EmailService:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("SENDGRID_API_KEY")
         self.from_email = os.getenv("EMAIL_FROM", "noreply@newsaggregator.com")
-        self.enabled = bool(self.api_key)
+        self.enabled = bool(self.api_key) and SENDGRID_AVAILABLE
         self._sg = None
+
+        if self.api_key and not SENDGRID_AVAILABLE:
+            logger.warning("[Email] sendgrid package not installed, email service disabled")
 
     @property
     def sg(self):
         """懒加载 SendGrid 客户端（复用连接）"""
         if self._sg is None and self.enabled:
-            from sendgrid import SendGridAPIClient
             self._sg = SendGridAPIClient(self.api_key)
         return self._sg
 
@@ -34,9 +44,6 @@ class EmailService:
             return False
 
         try:
-            import asyncio
-            from sendgrid.helpers.mail import Mail
-
             message = Mail(
                 from_email=self.from_email,
                 to_emails=to_email,
@@ -64,23 +71,16 @@ class EmailService:
         if not email_type:
             return
         try:
-            from web.database import SessionLocal
+            from web.database import get_session
             from web.models import EmailLog
 
-            db = SessionLocal()
-            try:
+            with get_session() as db:
                 log = EmailLog(
                     subscription_id=subscription_id,
                     email_type=email_type,
                     status=status,
                 )
                 db.add(log)
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                logger.error(f"EmailLog save error: {e}")
-            finally:
-                db.close()
         except Exception as e:
             logger.error(f"EmailLog save error: {e}")
 

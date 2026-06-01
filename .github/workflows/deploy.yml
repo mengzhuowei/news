@@ -44,7 +44,7 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD }}
 
       - name: Build static site
-        run: python -c "import os; from fetcher.site_builder import SiteBuilder; from pathlib import Path; success = SiteBuilder(Path('shared-content'), Path(os.getenv('DIST_DIR', 'dist')), use_db=True).build_all(); exit(0 if success else 1)"
+        run: python -c "import os; from fetcher.site_builder import SiteBuilder; from pathlib import Path; success = SiteBuilder(Path(os.getenv('DIST_DIR', 'dist'))).build_all(); exit(0 if success else 1)"
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD }}

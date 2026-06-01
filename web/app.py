@@ -35,18 +35,19 @@ _ADMIN_IP_WHITELIST = {
     if ip.strip()
 }
 
+_TRUSTED_PROXIES = {
+    ip.strip()
+    for ip in os.getenv("TRUSTED_PROXIES", "").split(",")
+    if ip.strip()
+}
+
 
 class AdminIPWhitelistMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         if path == "/admin" or path.startswith("/api/admin"):
             if _ADMIN_IP_WHITELIST:
-                client_ip = request.headers.get(
-                    "x-real-ip",
-                    request.headers.get(
-                        "x-forwarded-for", ""
-                    ).split(",")[0].strip()
-                ) or (request.client.host if request.client else "")
+                client_ip = self._get_client_ip(request)
                 if client_ip not in _ADMIN_IP_WHITELIST:
                     return JSONResponse(
                         status_code=403,
@@ -54,17 +55,38 @@ class AdminIPWhitelistMiddleware(BaseHTTPMiddleware):
                     )
         return await call_next(request)
 
+    @staticmethod
+    def _get_client_ip(request: Request) -> str:
+        direct_ip = request.client.host if request.client else ""
+        if not _TRUSTED_PROXIES:
+            return direct_ip
+        if direct_ip not in _TRUSTED_PROXIES:
+            return direct_ip
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
+        return direct_ip
+
 
 app.add_middleware(AdminIPWhitelistMiddleware)
 
 # CORS: 当 allow_credentials=True 时，allow_origins 不能用 "*"，否则浏览器会拒绝
 _cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
-_cors_origins = [o.strip() for o in _cors_origins if o.strip()]
+_cors_origins = [o.strip() for o in _cors_origins if o.strip() and o.strip() != "*"]
+_allow_creds = True
+if not _cors_origins:
+    _raw = os.getenv("CORS_ORIGINS", "").strip()
+    if _raw == "*":
+        _cors_origins = ["*"]
+        _allow_creds = False
 if _cors_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins,
-        allow_credentials=True,
+        allow_credentials=_allow_creds,
         allow_methods=["*"],
         allow_headers=["*"],
     )

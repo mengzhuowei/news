@@ -63,9 +63,7 @@ class FetchScheduler:
         """完整抓取流程：抓取 → 去重URL → 过滤已入库 → 充实 → 清洗 → 洗稿 → 入库 → 清理 → 构建"""
         logger.info(f"[{datetime.now(timezone.utc)}] Starting scheduled fetch...")
 
-        self.cleaner._seen_hashes.clear()
-        self.cleaner._seen_titles.clear()
-        self.cleaner._hash_buckets.clear()
+        self.cleaner.reset()
 
         try:
             tasks = [self._fetch_source(f) for f in self.aggregator.fetchers]
@@ -164,20 +162,17 @@ class FetchScheduler:
 
     def _batch_check_db(self, articles: list) -> set:
         """批量查询已存在的 URL，一次 DB 查询替代 N 次单条查询"""
-        from web.database import SessionLocal
+        from web.database import get_session
         from web.models import Article as ArticleModel
 
         urls = [a.url for a in articles]
         existing = set()
         batch_size = 500
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             for i in range(0, len(urls), batch_size):
                 chunk = urls[i:i + batch_size]
                 rows = db.query(ArticleModel.url).filter(ArticleModel.url.in_(chunk)).all()
                 existing.update(r[0] for r in rows)
-        finally:
-            db.close()
         return existing
 
     def _try_async_build(self, reason: str = ""):
@@ -255,84 +250,75 @@ class FetchScheduler:
         started_at: datetime, error_message: Optional[str] = None,
     ):
         """记录抓取日志到数据库"""
-        from web.database import SessionLocal
+        from web.database import get_session
         from web.models import FetchLog
 
-        db = SessionLocal()
         try:
-            log = FetchLog(
-                source=source,
-                articles_count=articles_count,
-                status=status,
-                error_message=error_message,
-                started_at=started_at,
-                completed_at=datetime.now(timezone.utc),
-            )
-            db.add(log)
-            db.commit()
+            with get_session() as db:
+                log = FetchLog(
+                    source=source,
+                    articles_count=articles_count,
+                    status=status,
+                    error_message=error_message,
+                    started_at=started_at,
+                    completed_at=datetime.now(timezone.utc),
+                )
+                db.add(log)
         except Exception as e:
-            db.rollback()
             logger.error(f"FetchLog save error: {e}")
-        finally:
-            db.close()
 
     def _save_to_db(self, article) -> bool:
-        """保存文章到数据库，返回是否成功"""
-        from web.database import SessionLocal
+        """保存文章到数据库，返回是否成功 — 使用 IntegrityError 处理并发插入"""
+        from sqlalchemy.exc import IntegrityError
+        from web.database import get_session
         from web.models import Article as ArticleModel
 
-        db = SessionLocal()
         try:
-            if db.query(ArticleModel).filter(ArticleModel.url == article.url).first():
-                return False
-            record = ArticleModel(
-                url=article.url,
-                title=article.title,
-                summary=article.summary or '',
-                content=article.content or '',
-                source=article.source,
-                category=article.category,
-                author=(article.author or 'Unknown')[:10000],
-                image_url=article.image_url or '',
-                is_rewritten=article.rewritten,
-                published_at=article.published,
-            )
-            db.add(record)
-            db.commit()
-            record.slug = make_slug(article.source, article.title, record.id)
-            db.commit()
+            with get_session() as db:
+                record = ArticleModel(
+                    url=article.url,
+                    title=article.title,
+                    summary=article.summary or '',
+                    content=article.content or '',
+                    source=article.source,
+                    category=article.category,
+                    author=(article.author or 'Unknown')[:255],
+                    image_url=article.image_url or '',
+                    is_rewritten=article.rewritten,
+                    published_at=article.published,
+                    slug=make_slug(article.source, article.title, 0),
+                )
+                db.add(record)
+                db.flush()
+                record.slug = make_slug(article.source, article.title, record.id)
             return True
+        except IntegrityError:
+            logger.debug(f"Article already exists (concurrent insert): {article.url[:80]}")
+            return False
         except Exception as e:
-            db.rollback()
             logger.error(f"DB save error: {e}")
             return False
-        finally:
-            db.close()
 
     def _cleanup_expired_articles(self, days: int = 7):
         """清理过期文章"""
-        from web.database import SessionLocal
+        from web.database import get_session
         from web.models import Article as ArticleModel
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         batch_size = 500
-        db = SessionLocal()
+        total_removed = 0
         try:
-            total_removed = 0
-            while True:
-                articles = db.query(ArticleModel).filter(ArticleModel.published_at < cutoff).limit(batch_size).all()
-                if not articles:
-                    break
-                for article in articles:
-                    db.delete(article)
-                db.commit()
-                total_removed += len(articles)
+            with get_session() as db:
+                while True:
+                    articles = db.query(ArticleModel).filter(ArticleModel.published_at < cutoff).limit(batch_size).all()
+                    if not articles:
+                        break
+                    for article in articles:
+                        db.delete(article)
+                    total_removed += len(articles)
             logger.info(f"Cleaned up {total_removed} expired articles")
         except Exception as e:
-            db.rollback()
             logger.error(f"Cleanup error: {e}")
-        finally:
-            db.close()
 
     def _build_static_site(self):
         """构建静态站点（等待正在进行的构建完成后再执行）"""

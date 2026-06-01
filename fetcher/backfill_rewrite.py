@@ -9,7 +9,7 @@ from loguru import logger
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fetcher.summarizer import Summarizer
-from web.database import SessionLocal
+from web.database import get_session
 from web.models import Article
 
 
@@ -17,10 +17,10 @@ BATCH_SIZE = 10
 CONCURRENT = 3
 
 
-async def rewrite_article(summarizer: Summarizer, article: Article) -> tuple[int, str, str, bool]:
-    rewritten_content, rewritten_summary = await summarizer.rewrite(article.title, article.content)
-    success = (rewritten_content != article.content)
-    return article.id, rewritten_content, rewritten_summary, success
+async def rewrite_article(summarizer: Summarizer, article_id: int, title: str, content: str) -> tuple[int, str, str, bool]:
+    rewritten_content, rewritten_summary = await summarizer.rewrite(title, content)
+    success = (rewritten_content != content)
+    return article_id, rewritten_content, rewritten_summary, success
 
 
 async def run_backfill(dry_run: bool = False):
@@ -32,31 +32,37 @@ async def run_backfill(dry_run: bool = False):
 
     logger.info(f"Model: {summarizer.model}, Base URL: {summarizer.base_url}")
 
-    db = SessionLocal()
-    try:
-        articles = db.query(Article).filter(Article.is_rewritten == False).all()
-        logger.info(f"Found {len(articles)} articles to backfill")
+    with get_session() as db:
+        total = db.query(Article).filter(Article.is_rewritten == False).count()
+    logger.info(f"Found {total} articles to backfill")
 
-        if dry_run:
-            for a in articles[:5]:
+    if dry_run:
+        with get_session() as db:
+            articles = db.query(Article).filter(Article.is_rewritten == False).limit(5).all()
+            for a in articles:
                 logger.info(f"  [DRY RUN] id={a.id} title={a.title[:60]} len={len(a.content)}")
-            return
+        return
 
-        total = len(articles)
-        done = 0
-        success_count = 0
+    done = 0
+    success_count = 0
 
-        sem = asyncio.Semaphore(CONCURRENT)
+    sem = asyncio.Semaphore(CONCURRENT)
 
-        async def limited_rewrite(article):
-            async with sem:
-                return await rewrite_article(summarizer, article)
+    async def limited_rewrite(article_id: int, title: str, content: str):
+        async with sem:
+            return await rewrite_article(summarizer, article_id, title, content)
 
-        for i in range(0, total, BATCH_SIZE):
-            batch = articles[i:i + BATCH_SIZE]
-            tasks = [limited_rewrite(a) for a in batch]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+    for offset in range(0, total, BATCH_SIZE):
+        with get_session() as db:
+            batch = db.query(Article).filter(Article.is_rewritten == False).offset(offset).limit(BATCH_SIZE).all()
+            if not batch:
+                break
+            batch_data = [(a.id, a.title, a.content) for a in batch]
 
+        tasks = [limited_rewrite(aid, title, content) for aid, title, content in batch_data]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        with get_session() as db:
             for result in results:
                 if isinstance(result, Exception):
                     logger.error(f"Rewrite error: {result}")
@@ -65,7 +71,7 @@ async def run_backfill(dry_run: bool = False):
 
                 article_id, content, summary, success = result
                 if success:
-                    article = db.query(Article).get(article_id)
+                    article = db.query(Article).filter(Article.id == article_id).first()
                     if article:
                         article.content = content
                         article.summary = summary
@@ -73,16 +79,12 @@ async def run_backfill(dry_run: bool = False):
                         success_count += 1
                 done += 1
 
-            db.commit()
+        pct = done / total * 100
+        logger.info(f"Progress: {done}/{total} ({pct:.1f}%) — {success_count} rewritten successfully")
 
-            pct = done / total * 100
-            logger.info(f"Progress: {done}/{total} ({pct:.1f}%) — {success_count} rewritten successfully")
+        await asyncio.sleep(1)
 
-            await asyncio.sleep(1)
-
-        logger.info(f"Backfill complete: {success_count}/{total} articles rewritten")
-    finally:
-        db.close()
+    logger.info(f"Backfill complete: {success_count}/{total} articles rewritten")
 
 
 if __name__ == "__main__":

@@ -16,9 +16,7 @@ from fetcher.site_builder import SiteBuilder
 
 output_dir = Path(os.getenv('DIST_DIR', 'dist'))
 builder = SiteBuilder(
-    content_dir=Path('shared-content'),
     output_dir=output_dir,
-    use_db=True,
 )
 success = builder.build_all()
 if success:

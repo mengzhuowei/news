@@ -29,7 +29,7 @@ class SimHash:
 
         v = np.zeros(self.hash_bits, dtype=int)
         for feature in features:
-            hash_val = int(hashlib.md5(feature.encode()).hexdigest(), 16) % (2 ** self.hash_bits)
+            hash_val = int.from_bytes(hashlib.md5(feature.encode()).digest(), 'big') % (1 << self.hash_bits)
             for i in range(self.hash_bits):
                 v[i] += 1 if (hash_val >> i) & 1 else -1
 
@@ -69,6 +69,12 @@ class ContentCleaner:
         self._seen_hashes: Set[int] = set()
         self._seen_titles: Set[str] = set()
         self._hash_buckets: dict[int, list[int]] = {}
+
+    def reset(self):
+        """重置去重状态 — 每轮抓取前调用"""
+        self._seen_hashes.clear()
+        self._seen_titles.clear()
+        self._hash_buckets.clear()
 
     def clean(self, article: Article) -> Optional[Article]:
         """清洗文章，重复则返回 None"""

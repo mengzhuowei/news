@@ -30,13 +30,17 @@ class Article(Base):
 
 class Subscription(Base):
     __tablename__ = 'subscriptions'
+    __table_args__ = (
+        # 至少要有 email 或 chat_id 之一，防止孤儿记录
+        {"mysql_charset": "utf8mb4"},
+    )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    email = Column(String(255), nullable=True)  # Telegram 订阅时可选
-    chat_id = Column(BigInteger, unique=True, nullable=True)  # Telegram chat_id
+    email = Column(String(255), nullable=True)
+    chat_id = Column(BigInteger, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
     frequency = Column(Enum('daily', 'weekly'), default='daily')
-    push_time = Column(String(8), default='09:00:00')  # HH:MM:SS 格式
+    push_time = Column(String(8), default='09:00:00')
     timezone = Column(String(50), default='UTC')
     push_channel = Column(Enum('telegram', 'email'), default='telegram')
     site = Column(String(100))
@@ -45,6 +49,11 @@ class Subscription(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     confirmed_at = Column(DateTime)
     last_pushed_at = Column(DateTime)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.email and not self.chat_id:
+            raise ValueError("Subscription must have at least email or chat_id")
 
 
 class EmailLog(Base):

@@ -137,6 +137,9 @@ class ContentEnricher:
                             return None
             except (socket.gaierror, ValueError):
                 pass
+            # NOTE: DNS rebinding between resolution and actual HTTP request is a known TOCTOU
+            # limitation. For stricter protection, use a custom DNS resolver and bind the
+            # resolved IP to the curl_cffi request.
 
         session = await self._get_session()
         try:

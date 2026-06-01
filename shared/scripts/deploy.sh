@@ -20,8 +20,8 @@ echo "=== Deploying to ${REMOTE_HOST} ==="
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new)
 if [ -n "$SSH_KEY" ]; then
     KEY_FILE=$(mktemp)
-    echo "$SSH_KEY" > "$KEY_FILE"
     chmod 600 "$KEY_FILE"
+    echo "$SSH_KEY" > "$KEY_FILE"
     SSH_OPTS+=(-i "$KEY_FILE")
 fi
 
