@@ -76,6 +76,7 @@ class SiteBuilder:
                 if date.tzinfo is None:
                     date = date.replace(tzinfo=timezone.utc)
 
+                date_path = date.strftime("%Y/%m/%d")
                 sections.setdefault(category, []).append({
                     "id": a.id,
                     "title": a.title or "Untitled",
@@ -90,11 +91,12 @@ class SiteBuilder:
                     "author": a.author or "Unknown",
                     "image": a.image_url or "",
                     "date": date,
+                    "date_path": date_path,
                     "published_iso": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "published_display": (
                         f"{calendar.month_name[date.month]} {date.day}, {date.year}"
                     ),
-                    "permalink": f"{self._site_url}/{category}/{slug}/",
+                    "permalink": f"{self._site_url}/{category}/{date_path}/{slug}/",
                     "slug": slug,
                     "section": category,
                     "rewritten": a.is_rewritten or False,
@@ -184,7 +186,7 @@ class SiteBuilder:
     def _render_article_page(self, section_name: str, article: dict, sections: dict):
         """渲染单篇文章页"""
         template = self.env.get_template("single.html")
-        out_dir = self.output_dir / section_name / article["slug"]
+        out_dir = self.output_dir / section_name / article["date_path"] / article["slug"]
         out_dir.mkdir(parents=True, exist_ok=True)
 
         ctx = self._base_ctx(

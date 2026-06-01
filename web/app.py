@@ -7,11 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from web.database import init_db
 from web.routes import subscribe, subscription, admin, telegram_subscribe
@@ -26,6 +27,35 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="News Aggregator API", lifespan=lifespan)
+
+
+_ADMIN_IP_WHITELIST = {
+    ip.strip()
+    for ip in os.getenv("ADMIN_IP_WHITELIST", "").split(",")
+    if ip.strip()
+}
+
+
+class AdminIPWhitelistMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path == "/admin" or path.startswith("/api/admin"):
+            if _ADMIN_IP_WHITELIST:
+                client_ip = request.headers.get(
+                    "x-real-ip",
+                    request.headers.get(
+                        "x-forwarded-for", ""
+                    ).split(",")[0].strip()
+                ) or (request.client.host if request.client else "")
+                if client_ip not in _ADMIN_IP_WHITELIST:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Access denied"},
+                    )
+        return await call_next(request)
+
+
+app.add_middleware(AdminIPWhitelistMiddleware)
 
 # CORS: 当 allow_credentials=True 时，allow_origins 不能用 "*"，否则浏览器会拒绝
 _cors_origins = os.getenv("CORS_ORIGINS", "").split(",")

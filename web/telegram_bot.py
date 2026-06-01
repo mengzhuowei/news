@@ -41,6 +41,21 @@ CATEGORY_ICONS = {
 
 _pending_selections: dict[int, list[str]] = {}
 
+COMMON_TIMEZONES = [
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Moscow",
+    "Asia/Dubai",
+    "Asia/Shanghai",
+    "Asia/Tokyo",
+    "Australia/Sydney",
+    "Pacific/Auckland",
+]
+
 
 def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
                              done_text: str = "Done",
@@ -54,6 +69,23 @@ def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
         ])
     keyboard.append([
         InlineKeyboardButton(done_text, callback_data=done_data)
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _build_timezone_keyboard() -> InlineKeyboardMarkup:
+    keyboard = []
+    row = []
+    for i, tz in enumerate(COMMON_TIMEZONES):
+        label = tz.split("/", 1)[1].replace("_", " ")
+        row.append(InlineKeyboardButton(label, callback_data=f"tz_{tz}"))
+        if (i + 1) % 3 == 0:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([
+        InlineKeyboardButton("⏭ Skip (UTC)", callback_data="tz_UTC")
     ])
     return InlineKeyboardMarkup(keyboard)
 
@@ -276,6 +308,8 @@ class NewsTelegramBot:
             await self._handle_subscribe_callback(query, chat_id, data)
         elif data.startswith("cat_"):
             await self._handle_category_callback(query, chat_id, data)
+        elif data.startswith("tz_"):
+            await self._handle_timezone_callback(query, chat_id, data)
         elif data.startswith("confirm_"):
             await self._handle_confirm_callback(query, chat_id, data)
         elif data == "reactivate":
@@ -285,7 +319,14 @@ class NewsTelegramBot:
 
     async def _handle_subscribe_callback(self, query, chat_id: int, data: str):
         if data == "sub_done":
-            await self._handle_subscribe_confirm(query, chat_id)
+            selected = _pending_selections.get(chat_id, [])
+            cats_display = ", ".join(selected) if selected else "all categories"
+            await query.edit_message_text(
+                f"📂 Categories selected: <i>{cats_display}</i>\n\n"
+                "🌍 Now select your timezone:",
+                parse_mode="HTML",
+                reply_markup=_build_timezone_keyboard(),
+            )
             return
 
         category = data[4:]
@@ -339,6 +380,55 @@ class NewsTelegramBot:
             await query.edit_message_text(
                 f"🎉 <b>Subscribed!</b>\n\n"
                 f"You'll receive news from: <i>{cats_display}</i>\n\n"
+                "Commands:\n"
+                "/status - View subscription status\n"
+                "/settime HH:MM - Set push time\n"
+                "/categories - Manage categories\n"
+                "/stop - Unsubscribe",
+                parse_mode="HTML",
+            )
+        finally:
+            db.close()
+
+    async def _handle_timezone_callback(self, query, chat_id: int, data: str):
+        timezone = data[3:]
+        selected = _pending_selections.pop(chat_id, [])
+
+        db = SessionLocal()
+        try:
+            existing = db.query(Subscription).filter(
+                Subscription.chat_id == chat_id
+            ).first()
+
+            if existing:
+                if existing.is_active:
+                    await query.edit_message_text("✅ You're already subscribed!")
+                    return
+                existing.is_active = True
+                existing.categories = selected
+                existing.timezone = timezone
+                existing.confirmed_at = datetime.now(timezone.utc)
+                db.commit()
+            else:
+                subscription = Subscription(
+                    chat_id=chat_id,
+                    categories=selected,
+                    push_time="09:00:00",
+                    timezone=timezone,
+                    push_channel="telegram",
+                    is_active=True,
+                    confirm_token=secrets.token_urlsafe(32),
+                    confirmed_at=datetime.now(timezone.utc),
+                )
+                db.add(subscription)
+                db.commit()
+
+            cats_display = ", ".join(_escape_html(c) for c in selected) if selected else "all categories"
+            tz_display = timezone.replace("_", " ")
+            await query.edit_message_text(
+                f"🎉 <b>Subscribed!</b>\n\n"
+                f"You'll receive news from: <i>{cats_display}</i>\n"
+                f"🕐 <b>Timezone:</b> {tz_display}\n\n"
                 "Commands:\n"
                 "/status - View subscription status\n"
                 "/settime HH:MM - Set push time\n"
