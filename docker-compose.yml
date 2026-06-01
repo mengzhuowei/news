@@ -104,6 +104,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - PUSH_CHECK_INTERVAL=${PUSH_CHECK_INTERVAL:-60}
       - ARTICLES_PER_PUSH=${ARTICLES_PER_PUSH:-10}
+      - SITE_BASEURL=${SITE_BASEURL:-}
     networks:
       - news-network
 

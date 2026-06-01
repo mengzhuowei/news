@@ -1,13 +1,17 @@
-"""管理 API — 文章管理/统计/日志/构建（需 HTTP Basic Auth）"""
+"""管理 API — 文章管理/统计/日志/构建（需 Session Cookie 认证）
+
+注意：Session 存储在进程内存中，多 worker 部署时需配置粘性会话或改用 Redis 等共享存储。
+"""
 
 import os
 import hmac
+import secrets
 import threading
+import time
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from loguru import logger
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -15,27 +19,114 @@ from web.database import get_db
 from web.models import Article, Subscription, FetchLog, EmailLog
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-security = HTTPBasic()
+
+_ADMIN_SESSIONS: dict[str, float] = {}
+_SESSION_TTL = 86400
+_SESSION_COOKIE_NAME = "admin_session"
+_SESSION_LOCK = threading.Lock()
+_LAST_CLEANUP = 0.0
+_CLEANUP_INTERVAL = 300.0
 
 
-def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """HTTP Basic Auth 验证 — 使用恒定时间比较防止时序攻击"""
+def _cleanup_expired_sessions():
+    now = time.time()
+    expired = [k for k, v in _ADMIN_SESSIONS.items() if now - v > _SESSION_TTL]
+    for k in expired:
+        del _ADMIN_SESSIONS[k]
+
+
+def _maybe_cleanup():
+    """每隔 5 分钟清理过期 session，避免频繁遍历"""
+    global _LAST_CLEANUP
+    now = time.time()
+    if now - _LAST_CLEANUP < _CLEANUP_INTERVAL:
+        return
+    _LAST_CLEANUP = now
+    _cleanup_expired_sessions()
+
+
+def _verify_admin_credentials(username: str, password: str) -> bool:
     admin_username = os.getenv("ADMIN_USERNAME", "admin")
     admin_password = os.getenv("ADMIN_PASSWORD")
     if not admin_password:
-        raise HTTPException(status_code=500, detail="ADMIN_PASSWORD not set")
+        return False
+    return hmac.compare_digest(username, admin_username) and hmac.compare_digest(password, admin_password)
 
-    if not (hmac.compare_digest(credentials.username, admin_username)
-            and hmac.compare_digest(credentials.password, admin_password)):
-        raise HTTPException(
-            status_code=401, detail="Unauthorized",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+
+def verify_session(request: Request) -> str:
+    """Session Cookie 验证 — 替代 HTTP Basic Auth，避免凭据存储在 localStorage"""
+    session_id = request.cookies.get(_SESSION_COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    with _SESSION_LOCK:
+        _maybe_cleanup()
+        if session_id not in _ADMIN_SESSIONS:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        if time.time() - _ADMIN_SESSIONS[session_id] > _SESSION_TTL:
+            _ADMIN_SESSIONS.pop(session_id, None)
+            raise HTTPException(status_code=401, detail="Session expired")
+
+        _ADMIN_SESSIONS[session_id] = time.time()
+
+    return session_id
+
+
+@router.post("/login")
+async def admin_login(request: Request):
+    """Admin 登录 — 验证凭据后设置 HttpOnly Session Cookie"""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    username = body.get("username", "")
+    password = body.get("password", "")
+
+    if not _verify_admin_credentials(username, password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    session_id = secrets.token_urlsafe(32)
+    with _SESSION_LOCK:
+        _cleanup_expired_sessions()
+        _ADMIN_SESSIONS[session_id] = time.time()
+
+    response = Response(
+        content='{"status":"ok"}',
+        media_type="application/json",
+        status_code=200,
+    )
+    response.set_cookie(
+        key=_SESSION_COOKIE_NAME,
+        value=session_id,
+        httponly=True,
+        samesite="strict",
+        max_age=_SESSION_TTL,
+        secure=os.getenv("ADMIN_COOKIE_SECURE", "false").lower() == "true",
+    )
+    return response
+
+
+@router.post("/logout")
+async def admin_logout(request: Request, response: Response):
+    """Admin 登出 — 清除 Session Cookie"""
+    session_id = request.cookies.get(_SESSION_COOKIE_NAME)
+    if session_id:
+        with _SESSION_LOCK:
+            _ADMIN_SESSIONS.pop(session_id, None)
+
+    response = Response(
+        content='{"status":"ok"}',
+        media_type="application/json",
+        status_code=200,
+    )
+    response.delete_cookie(key=_SESSION_COOKIE_NAME)
+    return response
 
 
 @router.get("/stats")
-async def get_stats(admin: str = Depends(verify_credentials), db: Session = Depends(get_db)):
+async def get_stats(admin: str = Depends(verify_session), db: Session = Depends(get_db)):
     """站点统计（需认证）"""
     return {
         "total_articles": db.query(Article).count(),
@@ -55,7 +146,7 @@ async def list_articles(
     is_rewritten: Optional[bool] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """文章列表（支持筛选和分页，需认证）"""
@@ -92,7 +183,7 @@ async def list_articles(
 
 @router.get("/articles/sources")
 async def get_article_sources(
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """按来源统计文章数（需认证）
@@ -106,7 +197,7 @@ async def get_article_sources(
 @router.get("/articles/{article_id}")
 async def get_article(
     article_id: int,
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """文章详情（需认证）"""
@@ -131,7 +222,7 @@ async def get_article(
 @router.delete("/articles/{article_id}")
 async def delete_article(
     article_id: int,
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """删除文章（需认证）"""
@@ -147,7 +238,7 @@ async def delete_article(
 @router.post("/articles/cleanup")
 async def cleanup_articles(
     days: int = Query(7, ge=1, le=90),
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """清理过期文章（分批处理，需认证）"""
@@ -179,7 +270,7 @@ async def get_fetch_logs(
     source: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """抓取日志（分页，需认证）"""
@@ -210,7 +301,7 @@ async def get_fetch_logs(
 async def list_subscriptions(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """订阅用户列表（分页，需认证）"""
@@ -244,7 +335,7 @@ async def get_email_logs(
     status: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    admin: str = Depends(verify_credentials),
+    admin: str = Depends(verify_session),
     db: Session = Depends(get_db),
 ):
     """邮件发送日志（分页，需认证）"""
@@ -275,7 +366,7 @@ _build_lock = threading.Lock()
 
 
 @router.post("/build")
-async def trigger_build(admin: str = Depends(verify_credentials)):
+async def trigger_build(admin: str = Depends(verify_session)):
     """触发站点构建（后台线程，需认证）"""
     global _build_status
     started_at = datetime.now(timezone.utc).isoformat()
@@ -324,7 +415,7 @@ async def trigger_build(admin: str = Depends(verify_credentials)):
 
 
 @router.get("/build/status")
-async def get_build_status(admin: str = Depends(verify_credentials)):
+async def get_build_status(admin: str = Depends(verify_session)):
     """查询构建状态（需认证）"""
     with _build_lock:
         return dict(_build_status)

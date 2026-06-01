@@ -6,15 +6,28 @@
 <meta property="og:url" content="{{ site_url }}/">
 <meta property="og:site_name" content="{{ site_title }}">
 <meta property="og:type" content="website">
+{% if hero_article and hero_article.image %}
+<meta property="og:image" content="{{ hero_article.image }}">
+<meta name="twitter:card" content="summary_large_image">
+{% else %}
 <meta name="twitter:card" content="summary">
+{% endif %}
 <meta name="twitter:title" content="{{ site_title }}">
 <meta name="twitter:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
+{% if hero_article and hero_article.image %}
+<meta name="twitter:image" content="{{ hero_article.image }}">
+{% endif %}
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": {{ site_title | tojson }},
-    "url": "{{ site_url }}/"
+    "url": "{{ site_url }}/",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": "{{ site_url }}/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
 }
 </script>
 {% endblock %}
@@ -31,7 +44,7 @@
                 <span class="source-badge">{{ hero_article.source }}</span>
                 <h2><a href="{{ hero_article.permalink }}">{{ hero_article.title }}</a></h2>
                 <div class="article-meta">
-                    {{ hero_article.published_display }} &middot; {{ hero_article.author }}
+                    <time datetime="{{ hero_article.published_iso }}">{{ hero_article.published_display }}</time> &middot; {{ hero_article.author }}
                 </div>
                 <p class="article-summary">{{ hero_article.summary }}</p>
             </div>
@@ -44,7 +57,7 @@
             <div class="article-card">
                 <span class="source-badge">{{ article.source }}</span>
                 <h2 style="font-size: 1rem;"><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
-                <div class="article-meta">{{ article.published_display }}</div>
+                    <div class="article-meta">{{ article.published_display }}</div>
             </div>
             {% endfor %}
         </div>
@@ -56,7 +69,7 @@
             <span class="source-badge">{{ article.source }}</span>
             <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
             <div class="article-meta">
-                {{ article.published_display }} &middot; {{ article.category }} &middot; {{ article.author }}
+                <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.category }} &middot; {{ article.author }}
             </div>
             <p class="article-summary">{{ article.summary }}</p>
         </div>

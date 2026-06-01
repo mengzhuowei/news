@@ -61,45 +61,52 @@ class SiteBuilder:
         return self.site_baseurl or f"https://{self.site_title.lower().replace(' ', '-')}.com"
 
     def _load_from_db(self) -> dict[str, list[dict]]:
-        """从数据库读取文章，按分类组织"""
+        """从数据库读取文章，按分类组织（分批加载 + 释放 identity map 避免内存溢出）"""
         from web.database import get_session
         from web.models import Article
 
         sections: dict[str, list[dict]] = {}
+        batch_size = 1000
+        offset = 0
         with get_session() as db:
-            articles = db.query(Article).order_by(Article.published_at.desc()).all()
-            for a in articles:
-                category = a.category or "uncategorized"
-                slug = a.slug or f"article-{a.id}"
-                date = a.published_at or a.created_at or datetime.now(timezone.utc)
-                if date.tzinfo is None:
-                    date = date.replace(tzinfo=timezone.utc)
+            while True:
+                articles = db.query(Article).order_by(Article.published_at.desc()).offset(offset).limit(batch_size).all()
+                if not articles:
+                    break
+                for a in articles:
+                    category = a.category or "uncategorized"
+                    slug = a.slug or f"article-{a.id}"
+                    date = a.published_at or a.created_at or datetime.now(timezone.utc)
+                    if date.tzinfo is None:
+                        date = date.replace(tzinfo=timezone.utc)
 
-                date_path = date.strftime("%Y/%m/%d")
-                sections.setdefault(category, []).append({
-                    "id": a.id,
-                    "title": a.title or "Untitled",
-                    "summary": a.summary or "",
-                    "content": a.content or "",
-                    "content_html": markdown.markdown(
-                        a.content, extensions=["tables", "fenced_code"]
-                    ) if a.content else "",
-                    "category": category,
-                    "source": a.source or "",
-                    "source_url": a.url or "",
-                    "author": a.author or "Unknown",
-                    "image": a.image_url or "",
-                    "date": date,
-                    "date_path": date_path,
-                    "published_iso": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "published_display": (
-                        f"{calendar.month_name[date.month]} {date.day}, {date.year}"
-                    ),
-                    "permalink": f"{self._site_url}/{category}/{date_path}/{slug}/",
-                    "slug": slug,
-                    "section": category,
-                    "rewritten": a.is_rewritten or False,
-                })
+                    date_path = date.strftime("%Y/%m/%d")
+                    sections.setdefault(category, []).append({
+                        "id": a.id,
+                        "title": a.title or "Untitled",
+                        "summary": a.summary or "",
+                        "content": a.content or "",
+                        "content_html": markdown.markdown(
+                            a.content, extensions=["tables", "fenced_code"]
+                        ) if a.content else "",
+                        "category": category,
+                        "source": a.source or "",
+                        "source_url": a.url or "",
+                        "author": a.author or "Unknown",
+                        "image": a.image_url or "",
+                        "date": date,
+                        "date_path": date_path,
+                        "published_iso": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "published_display": (
+                            f"{calendar.month_name[date.month]} {date.day}, {date.year}"
+                        ),
+                        "permalink": f"{self._site_url}/{category}/{date_path}/{slug}/",
+                        "slug": slug,
+                        "section": category,
+                        "rewritten": a.is_rewritten or False,
+                    })
+                db.expunge_all()
+                offset += batch_size
 
             for cat in sections:
                 sections[cat].sort(key=lambda a: a["date"], reverse=True)
@@ -178,11 +185,18 @@ class SiteBuilder:
         except Exception as e:
             logger.error(f"Failed to mark articles as built: {e}")
 
+    def _get_related_articles(self, article: dict, sections: dict, count: int = 5) -> list[dict]:
+        same_category = sections.get(article["category"], [])
+        related = [a for a in same_category if a["id"] != article["id"]]
+        return related[:count]
+
     def _render_article_page(self, section_name: str, article: dict, sections: dict):
         """渲染单篇文章页"""
         template = self.env.get_template("single.html")
         out_dir = self.output_dir / section_name / article["date_path"] / article["slug"]
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        related_articles = self._get_related_articles(article, sections)
 
         ctx = self._base_ctx(
             page=article,
@@ -190,6 +204,7 @@ class SiteBuilder:
             permalink=article["permalink"],
             canonical_url=article["permalink"],
             page_lang=article.get("language", "en"),
+            related_articles=related_articles,
             sections={k: {"count": len(v)} for k, v in sections.items()},
         )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
@@ -232,6 +247,7 @@ class SiteBuilder:
             canonical_url=canonical_url,
             prev_url=prev_url,
             next_url=next_url,
+            section_image=articles[0]["image"] if articles and articles[0].get("image") else "",
             sections={k: {"count": len(v)} for k, v in sections.items()},
         )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
@@ -258,6 +274,7 @@ class SiteBuilder:
         """生成 sitemap.xml — 包含首页、分类页和文章页"""
         urlset = Element("urlset")
         urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+        urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
 
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -280,6 +297,11 @@ class SiteBuilder:
                 SubElement(url_el, "lastmod").text = article["published_iso"]
                 SubElement(url_el, "changefreq").text = "daily"
                 SubElement(url_el, "priority").text = "0.6"
+                if article.get("image"):
+                    img_el = SubElement(url_el, "image:image")
+                    SubElement(img_el, "image:loc").text = article["image"]
+                    if article.get("title"):
+                        SubElement(img_el, "image:title").text = article["title"]
 
         xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
             urlset, encoding="unicode"
@@ -287,13 +309,15 @@ class SiteBuilder:
         (self.output_dir / "sitemap.xml").write_text(xml_str, encoding="utf-8")
 
     def build_rss(self, sections: dict):
-        """生成 RSS feed"""
+        """生成 RSS feed（全局 + 按分类）"""
+        from email.utils import format_datetime
+
+        now_rfc2822 = format_datetime(datetime.now(timezone.utc))
+
         all_articles = sorted(
             [a for arts in sections.values() for a in arts],
             key=lambda a: a["date"], reverse=True,
         )[:50]
-
-        from email.utils import format_datetime
 
         items = []
         for a in all_articles:
@@ -313,10 +337,38 @@ class SiteBuilder:
             f'  <title>{_escape_xml(self.site_title)}</title>\n'
             f'  <link>{_escape_xml(self._site_url)}/</link>\n'
             f'  <description>{_escape_xml(self.site_title)} - News Aggregator</description>\n'
+            f'  <lastBuildDate>{now_rfc2822}</lastBuildDate>\n'
+            f'  <copyright>Copyright {datetime.now(timezone.utc).year} {_escape_xml(self.site_title)}</copyright>\n'
             f'{chr(10).join(items)}\n'
             '</channel>\n</rss>'
         )
         (self.output_dir / "index.xml").write_text(rss, encoding="utf-8")
+
+        for section_name, articles in sections.items():
+            cat_dir = self.output_dir / section_name
+            cat_dir.mkdir(parents=True, exist_ok=True)
+            cat_items = []
+            for a in articles[:30]:
+                pub_date = format_datetime(a["date"])
+                cat_items.append(
+                    f'  <item>\n'
+                    f'    <title>{_escape_xml(a["title"])}</title>\n'
+                    f'    <link>{_escape_xml(a["permalink"])}</link>\n'
+                    f'    <description>{_escape_xml(a["summary"] or "")}</description>\n'
+                    f'    <pubDate>{pub_date}</pubDate>\n'
+                    f'  </item>'
+                )
+            cat_rss = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<rss version="2.0">\n<channel>\n'
+                f'  <title>{_escape_xml(self.site_title)} - {section_name.capitalize()}</title>\n'
+                f'  <link>{_escape_xml(self._site_url)}/{section_name}/</link>\n'
+                f'  <description>{_escape_xml(self.site_title)} - Latest {section_name.capitalize()} News</description>\n'
+                f'  <lastBuildDate>{now_rfc2822}</lastBuildDate>\n'
+                f'{chr(10).join(cat_items)}\n'
+                '</channel>\n</rss>'
+            )
+            (cat_dir / "index.xml").write_text(cat_rss, encoding="utf-8")
 
     def build_robots_txt(self):
         """生成 robots.txt"""
@@ -324,6 +376,10 @@ class SiteBuilder:
         content = (
             "User-agent: *\n"
             "Allow: /\n"
+            "Disallow: /page/\n"
+            "Disallow: /admin/\n"
+            "Disallow: /subscribe\n"
+            "Disallow: /subscription/\n"
             f"Sitemap: {sitemap_url}\n"
         )
         (self.output_dir / "robots.txt").write_text(content, encoding="utf-8")

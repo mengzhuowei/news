@@ -36,7 +36,7 @@ class Subscription(Base):
     )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    email = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=True, unique=True)
     chat_id = Column(BigInteger, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
     frequency = Column(Enum('daily', 'weekly'), default='daily')

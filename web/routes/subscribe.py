@@ -1,7 +1,8 @@
 """订阅 API — 创建/确认/取消订阅"""
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, EmailStr, field_validator
@@ -15,11 +16,10 @@ from web.routes.auth import verify_token
 router = APIRouter(prefix="/api/subscribe", tags=["subscription"])
 
 
+@lru_cache(maxsize=1)
 def _get_email_service() -> EmailService:
-    """懒加载 EmailService 实例"""
-    if not hasattr(_get_email_service, '_instance'):
-        _get_email_service._instance = EmailService()
-    return _get_email_service._instance
+    """懒加载 EmailService 实例（线程安全单例）"""
+    return EmailService()
 
 
 def _safe_subscription_response(sub: Subscription) -> dict:
@@ -93,21 +93,24 @@ async def subscribe(request: SubscribeRequest, db: Session = Depends(get_db)):
 
 @router.get("/confirm/{token}")
 async def confirm_subscription(token: str, db: Session = Depends(get_db)):
-    """确认订阅 → 发送欢迎邮件"""
+    """确认订阅 → 发送欢迎邮件（token 24h 有效）"""
     subscription = db.query(Subscription).filter(Subscription.confirm_token == token).first()
     if not subscription:
         raise HTTPException(status_code=404, detail="Invalid token")
 
     if subscription.confirmed_at:
-        # 即使已确认，如果之前被取消过，重新激活
         if not subscription.is_active:
             subscription.is_active = True
             db.commit()
         return {"status": "already_confirmed", "email": subscription.email}
 
+    if subscription.created_at:
+        token_age = datetime.now(timezone.utc) - subscription.created_at
+        if token_age > timedelta(hours=24):
+            raise HTTPException(status_code=410, detail="Confirmation token has expired. Please request a new one.")
+
     subscription.confirmed_at = datetime.now(timezone.utc)
     subscription.is_active = True
-    # confirm_token 保留，用于后续身份验证（查询/更新/取消订阅）
     db.commit()
 
     categories = subscription.categories if subscription.categories else []

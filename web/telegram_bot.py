@@ -1,5 +1,7 @@
 """Telegram Bot — 处理用户交互和命令"""
 
+from __future__ import annotations
+
 import os
 import secrets
 import threading

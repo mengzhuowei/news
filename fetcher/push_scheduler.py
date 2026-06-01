@@ -2,13 +2,17 @@
 
 import os
 import asyncio
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Dict, Any, Tuple
 from loguru import logger
 
 from web.database import get_session
 from web.models import Subscription, Article
 from web.telegram_service import TelegramService
+
+MAX_CONCURRENT_CHATS = 10
+CHAT_RATE_LIMIT_DELAY = 0.05
 
 
 class PushScheduler:
@@ -19,6 +23,7 @@ class PushScheduler:
         self.telegram_service = TelegramService()
         self.articles_per_push = int(os.getenv("ARTICLES_PER_PUSH", "10"))
         self.site_baseurl = os.getenv("SITE_BASEURL", "").rstrip("/")
+        self._last_check_minute: dict[int, tuple] = {}
 
     async def run_continuously(self):
         """持续运行调度器"""
@@ -38,27 +43,39 @@ class PushScheduler:
         await self._check_and_push()
 
     async def _check_and_push(self):
-        """检查并发送到期的推送"""
+        """检查并发送到期的推送（按 chat_id 分组并发）"""
         due_subscriptions = self._get_due_subscriptions()
         logger.info(f"[PushScheduler] Found {len(due_subscriptions)} due subscriptions")
 
+        chat_groups: Dict[int, List[dict]] = defaultdict(list)
         for sub in due_subscriptions:
-            try:
-                articles = self._get_recent_articles(sub)
-                if articles:
-                    success = await self.telegram_service.send_digest(
-                        sub.chat_id, articles, sub.frequency
-                    )
-                    if success == "blocked":
-                        self._deactivate_subscription(sub.id)
-                        logger.info(f"[PushScheduler] Deactivated blocked subscription {sub.chat_id}")
-                    elif success:
-                        self._update_last_pushed(sub.id)
-                        logger.info(f"[PushScheduler] Sent digest to {sub.chat_id}")
-                else:
-                    logger.info(f"[PushScheduler] No articles for subscription {sub.chat_id}")
-            except Exception as e:
-                logger.error(f"[PushScheduler] Error processing subscription {sub.chat_id}: {e}")
+            chat_groups[sub["chat_id"]].append(sub)
+
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHATS)
+
+        async def push_chat(chat_id: int, subs: List[dict]):
+            async with semaphore:
+                for sub in subs:
+                    try:
+                        articles = await asyncio.to_thread(self._get_recent_articles_sync, sub)
+                        if articles:
+                            success = await self.telegram_service.send_digest(
+                                chat_id, articles, sub["frequency"]
+                            )
+                            if success == "blocked":
+                                self._deactivate_subscription(sub["id"])
+                                logger.info(f"[PushScheduler] Deactivated blocked subscription {chat_id}")
+                            elif success:
+                                self._update_last_pushed(sub["id"])
+                                logger.info(f"[PushScheduler] Sent digest to {chat_id}")
+                        else:
+                            logger.info(f"[PushScheduler] No articles for subscription {chat_id}")
+                        await asyncio.sleep(CHAT_RATE_LIMIT_DELAY)
+                    except Exception as e:
+                        logger.error(f"[PushScheduler] Error processing subscription {chat_id}: {e}")
+
+        tasks = [push_chat(chat_id, subs) for chat_id, subs in chat_groups.items()]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     def _get_due_subscriptions(self) -> List[dict]:
         """获取需要推送的订阅（返回纯数据，避免 session 关闭后访问延迟加载属性）"""
@@ -83,7 +100,7 @@ class PushScheduler:
             return due
 
     def _is_due(self, subscription, now: datetime) -> bool:
-        """判断订阅是否需要推送（基于用户本地时间）"""
+        """判断订阅是否需要推送（基于用户本地时间，记录已检查的分钟防止遗漏）"""
         push_time = subscription.push_time or "09:00:00"
         frequency = subscription.frequency or "daily"
         sub_tz_name = subscription.timezone or "UTC"
@@ -101,7 +118,14 @@ class PushScheduler:
         push_minutes = push_hour * 60 + push_min
         current_minutes = local_hour * 60 + local_min
 
+        sub_id = subscription.id if hasattr(subscription, 'id') else id(subscription)
+        current_day = local_now.date().toordinal()
+        last_key = (sub_id, current_day, frequency)
+
         if abs(current_minutes - push_minutes) > self.check_interval // 60 + 1:
+            return False
+
+        if self._last_check_minute.get(sub_id) == last_key:
             return False
 
         last_pushed = subscription.last_pushed_at
@@ -116,10 +140,14 @@ class PushScheduler:
                 if (now - last_pushed) < timedelta(days=6):
                     return False
 
+        self._last_check_minute[sub_id] = last_key
         return True
 
     def _get_recent_articles(self, sub: dict) -> List[dict]:
         """获取自上次推送以来的文章"""
+        return self._get_recent_articles_sync(sub)
+
+    def _get_recent_articles_sync(self, sub: dict) -> List[dict]:
         with get_session() as db:
             last_pushed = sub.get("last_pushed_at")
             categories = sub.get("categories", [])
@@ -138,16 +166,18 @@ class PushScheduler:
                 self.articles_per_push
             ).all()
 
-            return [
-                {
+            result = []
+            for a in articles:
+                article_url = self._build_permalink(a)
+                logger.debug(f"[PushScheduler] article url: {article_url}")
+                result.append({
                     "title": a.title,
                     "summary": a.summary,
-                    "url": self._build_permalink(a),
+                    "url": article_url,
                     "source": a.source,
                     "category": a.category,
-                }
-                for a in articles
-            ]
+                })
+            return result
 
     def _build_permalink(self, article: Article) -> str:
         """构建站内永久链接，回退到原始 URL"""

@@ -300,25 +300,27 @@ class FetchScheduler:
             return False
 
     def _cleanup_expired_articles(self, days: int = 7):
-        """清理过期文章"""
+        """清理过期文章 — 每批使用独立 session，避免长事务 rollback"""
         from web.database import get_session
         from web.models import Article as ArticleModel
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         batch_size = 500
         total_removed = 0
-        try:
-            with get_session() as db:
-                while True:
+        while True:
+            try:
+                with get_session() as db:
                     articles = db.query(ArticleModel).filter(ArticleModel.published_at < cutoff).limit(batch_size).all()
                     if not articles:
                         break
                     for article in articles:
                         db.delete(article)
                     total_removed += len(articles)
+            except Exception as e:
+                logger.error(f"Cleanup batch error: {e}")
+                break
+        if total_removed > 0:
             logger.info(f"Cleaned up {total_removed} expired articles")
-        except Exception as e:
-            logger.error(f"Cleanup error: {e}")
 
     def _build_static_site(self):
         """构建静态站点（等待正在进行的构建完成后再执行）"""

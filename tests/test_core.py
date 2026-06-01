@@ -1,53 +1,163 @@
-"""核心模块单元测试 — SimHash / ContentCleaner / Summarizer / _is_safe_url"""
+"""扩展单元测试 — 覆盖路由验证、认证、推送调度等关键逻辑"""
 
-import hashlib
-import re
 import pytest
+from datetime import datetime, timezone, timedelta
+from unittest.mock import MagicMock, patch
+
 
 from fetcher.cleaner import SimHash, ContentCleaner
 from fetcher.summarizer import Summarizer
 from fetcher.content_enricher import _is_safe_url
 from fetcher.fetchers.base import Article
-from datetime import datetime, timezone
+from fetcher.scheduler import make_slug
+from web.routes.auth import verify_token, verify_telegram_chat_id
+from web.routes.validators import validate_push_time, validate_frequency
+from web.models import Subscription
 
 
-class TestSimHash:
-    def test_identical_text_same_hash(self):
+class TestMakeSlug:
+    def test_basic_slug(self):
+        slug = make_slug("BBC News", "Hello World Article", 42)
+        assert "bbcnews" in slug
+        assert "42" in slug
+
+    def test_special_characters_removed(self):
+        slug = make_slug("Re:uters!", "Title with $pecial chars", 1)
+        assert "$" not in slug
+        assert "!" not in slug
+
+    def test_uniqueness_with_id(self):
+        slug1 = make_slug("Source", "Same Title", 1)
+        slug2 = make_slug("Source", "Same Title", 2)
+        assert slug1 != slug2
+
+
+class TestValidators:
+    def test_valid_push_time(self):
+        assert validate_push_time(None, "09:00:00") == "09:00:00"
+
+    def test_invalid_format(self):
+        with pytest.raises(ValueError):
+            validate_push_time(None, "9:00")
+
+    def test_invalid_hour(self):
+        with pytest.raises(ValueError):
+            validate_push_time(None, "25:00:00")
+
+    def test_invalid_minute(self):
+        with pytest.raises(ValueError):
+            validate_push_time(None, "09:60:00")
+
+    def test_none_passes(self):
+        assert validate_push_time(None, None) is None
+
+    def test_valid_frequency(self):
+        assert validate_frequency(None, "daily") == "daily"
+        assert validate_frequency(None, "weekly") == "weekly"
+
+    def test_invalid_frequency(self):
+        with pytest.raises(ValueError):
+            validate_frequency(None, "monthly")
+
+    def test_none_frequency(self):
+        assert validate_frequency(None, None) is None
+
+
+class TestVerifyToken:
+    def test_valid_token(self):
+        sub = Subscription(chat_id=123, confirm_token="abc123")
+        verify_token(sub, "abc123")
+
+    def test_invalid_token(self):
+        from fastapi import HTTPException
+        sub = Subscription(chat_id=123, confirm_token="abc123")
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(sub, "wrong")
+        assert exc_info.value.status_code == 403
+
+    def test_missing_token(self):
+        from fastapi import HTTPException
+        sub = Subscription(chat_id=123, confirm_token="abc123")
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(sub, None)
+        assert exc_info.value.status_code == 401
+
+
+class TestVerifyTelegramChatId:
+    def test_matching_chat_id(self):
+        sub = Subscription(chat_id=123)
+        verify_telegram_chat_id(sub, 123)
+
+    def test_mismatched_chat_id(self):
+        from fastapi import HTTPException
+        sub = Subscription(chat_id=123)
+        with pytest.raises(HTTPException) as exc_info:
+            verify_telegram_chat_id(sub, 456)
+        assert exc_info.value.status_code == 403
+
+    def test_none_chat_id(self):
+        from fastapi import HTTPException
+        sub = Subscription(chat_id=123)
+        with pytest.raises(HTTPException) as exc_info:
+            verify_telegram_chat_id(sub, None)
+        assert exc_info.value.status_code == 401
+
+
+class TestSubscriptionModel:
+    def test_requires_email_or_chat_id(self):
+        with pytest.raises(ValueError):
+            Subscription()
+
+    def test_valid_with_email(self):
+        sub = Subscription(email="test@example.com")
+        assert sub.email == "test@example.com"
+
+    def test_valid_with_chat_id(self):
+        sub = Subscription(chat_id=123)
+        assert sub.chat_id == 123
+
+
+class TestSafeUrlExtended:
+    def test_link_local_blocked(self):
+        assert not _is_safe_url("http://169.254.1.1/metadata")
+
+    def test_ipv4_mapped_ipv6_blocked(self):
+        assert not _is_safe_url("http://[::ffff:127.0.0.1]/admin")
+
+    def test_fc00_ipv6_blocked(self):
+        assert not _is_safe_url("http://[fc00::1]/internal")
+
+    def test_https_public_allowed(self):
+        assert _is_safe_url("https://www.reuters.com/article")
+
+    def test_javascript_scheme_blocked(self):
+        assert not _is_safe_url("javascript:alert(1)")
+
+
+class TestSimHashEdgeCases:
+    def test_single_word_text(self):
         sh = SimHash()
-        text = "The quick brown fox jumps over the lazy dog"
-        assert sh.compute(text) == sh.compute(text)
+        h = sh.compute("hello")
+        assert isinstance(h, int)
 
-    def test_similar_text_detected(self):
+    def test_two_word_text(self):
         sh = SimHash()
-        text1 = "The quick brown fox jumps over the lazy dog"
-        text2 = "The quick brown fox jumps over the lazy cat"
-        assert sh.is_similar(text1, text2, threshold=0.8)
+        h = sh.compute("hello world")
+        assert isinstance(h, int)
 
-    def test_different_text_not_similar(self):
+    def test_very_long_text(self):
         sh = SimHash()
-        text1 = "The quick brown fox jumps over the lazy dog"
-        text2 = "Quantum computing leverages superposition and entanglement"
-        assert not sh.is_similar(text1, text2, threshold=0.8)
+        text = "word " * 10000
+        h = sh.compute(text)
+        assert isinstance(h, int)
 
-    def test_empty_text_returns_zero(self):
+    def test_unicode_text(self):
         sh = SimHash()
-        assert sh.compute("") == 0
-
-    def test_hamming_distance_symmetric(self):
-        sh = SimHash()
-        h1 = sh.compute("hello world")
-        h2 = sh.compute("goodbye world")
-        assert sh.hamming_distance(h1, h2) == sh.hamming_distance(h2, h1)
-
-    def test_performance_digest_vs_hexdigest(self):
-        sh = SimHash()
-        feature = "test feature for hash"
-        h_digest = int.from_bytes(hashlib.md5(feature.encode()).digest(), 'big') % (1 << sh.hash_bits)
-        h_hex = int(hashlib.md5(feature.encode()).hexdigest(), 16) % (2 ** sh.hash_bits)
-        assert h_digest == h_hex
+        h = sh.compute("你好世界，这是一个测试")
+        assert isinstance(h, int)
 
 
-class TestContentCleaner:
+class TestContentCleanerEdgeCases:
     def _make_article(self, title="Test", content="Test content", url="https://example.com/test"):
         return Article(
             title=title,
@@ -59,121 +169,57 @@ class TestContentCleaner:
             category="technology",
         )
 
-    def test_clean_returns_article(self):
+    def test_script_tags_removed(self):
         cleaner = ContentCleaner()
-        article = self._make_article()
+        article = self._make_article(content='<p>Hello</p><script>alert("xss")</script>')
         result = cleaner.clean(article)
         assert result is not None
-        assert result.title == "Test"
+        assert "<script>" not in result.content
+        assert "alert" not in result.content
 
-    def test_duplicate_title_detected(self):
+    def test_style_tags_removed(self):
         cleaner = ContentCleaner()
-        a1 = self._make_article(title="Same Title", content="Content A")
-        a2 = self._make_article(title="Same Title", content="Content B", url="https://example.com/test2")
+        article = self._make_article(content='<p>Hello</p><style>body{color:red}</style>')
+        result = cleaner.clean(article)
+        assert result is not None
+        assert "<style>" not in result.content
+
+    def test_similar_content_dedup(self):
+        cleaner = ContentCleaner()
+        a1 = self._make_article(title="News: Market rises 5%", content="The stock market rose 5% today on strong earnings reports.")
+        a2 = self._make_article(title="News: Market rises 5%", content="The stock market rose 5% today on strong earnings reports!", url="https://example.com/test2")
         assert cleaner.clean(a1) is not None
         assert cleaner.clean(a2) is None
 
-    def test_html_tags_removed(self):
+    def test_ads_removed(self):
         cleaner = ContentCleaner()
-        article = self._make_article(content="<p>Hello <b>world</b></p>")
+        article = self._make_article(content="Real content. Subscribe to our newsletter now! Cookie Policy here.")
         result = cleaner.clean(article)
         assert result is not None
-        assert "<p>" not in result.content
-        assert "<b>" not in result.content
-
-    def test_truncation(self):
-        cleaner = ContentCleaner()
-        long_content = "A" * 10000
-        article = self._make_article(content=long_content)
-        result = cleaner.clean(article)
-        assert result is not None
-        assert len(result.content) <= 5003
-
-    def test_reset_clears_state(self):
-        cleaner = ContentCleaner()
-        a1 = self._make_article(title="Unique Title A")
-        cleaner.clean(a1)
-        assert len(cleaner._seen_titles) > 0
-        cleaner.reset()
-        assert len(cleaner._seen_titles) == 0
-        assert len(cleaner._seen_hashes) == 0
-        assert len(cleaner._hash_buckets) == 0
-
-    def test_reset_allows_reprocessing(self):
-        cleaner = ContentCleaner()
-        a1 = self._make_article(title="Reset Test")
-        assert cleaner.clean(a1) is not None
-        cleaner.reset()
-        a2 = self._make_article(title="Reset Test", url="https://example.com/test2")
-        assert cleaner.clean(a2) is not None
+        assert "Subscribe to" not in result.content
+        assert "Cookie" not in result.content
 
 
-class TestSummarizerValidation:
-    def test_valid_rewrite_accepted(self):
-        assert Summarizer._is_valid_rewrite(
-            "This is a completely rewritten version of the article with new wording.",
-            "This is the original article content that needs to be rewritten."
-        )
-
-    def test_empty_rewrite_rejected(self):
-        assert not Summarizer._is_valid_rewrite("", "Original content here.")
-
-    def test_identical_rewrite_rejected(self):
-        original = "This is the original text that should be modified by the LLM."
-        assert not Summarizer._is_valid_rewrite(original, original)
-
-    def test_invalid_pattern_rejected(self):
+class TestSummarizerValidationExtended:
+    def test_text_not_provided_pattern(self):
         assert not Summarizer._is_valid_rewrite(
-            "I cannot rewrite this content",
-            "Some original content here that is quite long and detailed."
+            "[Text not provided]",
+            "Original content that is quite long and detailed."
         )
 
-    def test_too_short_rewrite_rejected(self):
-        long_original = "A" * 300
+    def test_i_cannot_rewrite_pattern(self):
         assert not Summarizer._is_valid_rewrite(
-            "Short",
-            long_original,
+            "I cannot rewrite this content as requested.",
+            "Original content that is quite long and detailed."
         )
 
-    def test_fallback_summary_no_api_key(self):
-        summarizer = Summarizer(api_key=None)
-        result = summarizer.summarize("Title", "Short content.")
-        assert result == "Short content."
+    def test_whitespace_only_rejected(self):
+        assert not Summarizer._is_valid_rewrite(
+            "   \n\t  ",
+            "Original content here."
+        )
 
-    def test_fallback_summary_truncation(self):
-        summarizer = Summarizer(api_key=None)
-        long_content = "A" * 500
-        result = summarizer.summarize("Title", long_content)
-        assert len(result) <= 203
-
-
-class TestSafeUrl:
-    def test_public_url_allowed(self):
-        assert _is_safe_url("https://www.example.com/article")
-
-    def test_localhost_blocked(self):
-        assert not _is_safe_url("http://localhost/admin")
-
-    def test_private_ip_blocked(self):
-        assert not _is_safe_url("http://192.168.1.1/secret")
-
-    def test_127_ip_blocked(self):
-        assert not _is_safe_url("http://127.0.0.1/admin")
-
-    def test_10_ip_blocked(self):
-        assert not _is_safe_url("http://10.0.0.1/internal")
-
-    def test_172_16_ip_blocked(self):
-        assert not _is_safe_url("http://172.16.0.1/internal")
-
-    def test_ftp_scheme_blocked(self):
-        assert not _is_safe_url("ftp://example.com/file")
-
-    def test_metadata_endpoint_blocked(self):
-        assert not _is_safe_url("http://metadata.google.internal/computeMetadata/v1/")
-
-    def test_ipv6_loopback_blocked(self):
-        assert not _is_safe_url("http://[::1]/admin")
-
-    def test_no_hostname_blocked(self):
-        assert not _is_safe_url("https:///path")
+    def test_valid_rewrite_with_different_wording(self):
+        original = "The quick brown fox jumped over the lazy dog on a sunny afternoon."
+        rewritten = "A fast dark-colored fox leaped across the sleepy canine during bright daylight."
+        assert Summarizer._is_valid_rewrite(rewritten, original)

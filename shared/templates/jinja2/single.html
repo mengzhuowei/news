@@ -4,6 +4,7 @@
 {% block description %}{{ page.summary[:160] }}{% endblock %}
 
 {% block head %}
+<meta name="author" content="{{ page.author }}">
 <meta property="og:title" content="{{ page.title }}">
 <meta property="og:description" content="{{ page.summary[:160] }}">
 <meta property="og:url" content="{{ permalink }}">
@@ -25,10 +26,22 @@
 {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": {{ permalink | tojson }}
+    },
     "headline": {{ page.title | tojson }},
     "datePublished": {{ page.published_iso | tojson }},
+    "dateModified": {{ page.published_iso | tojson }},
     "author": {"@type": "Person", "name": {{ page.author | tojson }}},
-    "publisher": {"@type": "Organization", "name": {{ site_title | tojson }}}
+    "publisher": {
+        "@type": "Organization",
+        "name": {{ site_title | tojson }},
+        "logo": {
+            "@type": "ImageObject",
+            "url": "{{ site_url }}/logo.png"
+        }
+    }
     {% if page.image %},"image": {{ page.image | tojson }}{% endif %}
 }
 </script>
@@ -55,12 +68,12 @@
     <span class="source-badge">{{ page.source }}</span>
     <h1>{{ page.title }}</h1>
     <div class="article-meta" style="margin-bottom: 1.5rem;">
-        {{ page.published_display }} &middot; {{ page.author }} &middot;
+        <time datetime="{{ page.published_iso }}">{{ page.published_display }}</time> &middot; {{ page.author }} &middot;
         <a href="{{ page.source_url }}" target="_blank" rel="noopener">Original Source</a>
     </div>
 
     {% if page.image %}
-    <img src="{{ page.image }}" alt="{{ page.title }}" width="800" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
+    <img src="{{ page.image }}" alt="{{ page.title }}" width="800" loading="lazy" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
     {% endif %}
 
     {% if adsense_client_id %}
@@ -81,4 +94,20 @@
     </div>
     {% endif %}
 </article>
+
+{% if related_articles %}
+<section style="margin-top: 2rem;">
+    <h2 style="margin-bottom: 1rem; color: #1a1a2e;">Related Articles</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+        {% for article in related_articles %}
+        <div class="article-card">
+            <span class="source-badge">{{ article.source }}</span>
+            <h3 style="font-size: 1rem; margin-bottom: 0.3rem;"><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
+            <div class="article-meta">{{ article.published_display }}</div>
+            <p class="article-summary" style="font-size: 0.85rem;">{{ article.summary[:120] }}{% if article.summary | length > 120 %}...{% endif %}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

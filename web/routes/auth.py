@@ -17,3 +17,14 @@ def verify_token(subscription: Subscription, token: Optional[str]) -> None:
         subscription.confirm_token, token
     ):
         raise HTTPException(status_code=403, detail="Invalid token")
+
+
+def verify_telegram_chat_id(subscription: Subscription, chat_id: Optional[int]) -> None:
+    """验证 Telegram chat_id 是否与订阅记录匹配 — 替代 token 验证"""
+    if chat_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="chat_id verification required.",
+        )
+    if subscription.chat_id != chat_id:
+        raise HTTPException(status_code=403, detail="chat_id does not match subscription")

@@ -33,6 +33,7 @@ engine = create_engine(
     pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
     max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
     pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+    connect_args={"init_command": "SET SESSION time_zone = '+00:00'"},
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -106,6 +107,7 @@ def _wait_for_database():
 def _ensure_database_exists():
     server_engine = create_engine(_MYSQL_SERVER_URL, echo=False, isolation_level="AUTOCOMMIT")
     try:
+        _safe_db_name = MYSQL_DATABASE.replace('`', '``')
         with server_engine.connect() as conn:
             result = conn.execute(
                 text("SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = :name"),
@@ -115,7 +117,7 @@ def _ensure_database_exists():
                 logger.info(f"[init_db] Database '{MYSQL_DATABASE}' does not exist, creating...")
                 conn.execute(
                     text(
-                        f"CREATE DATABASE `{MYSQL_DATABASE}` "
+                        f"CREATE DATABASE `{_safe_db_name}` "
                         f"DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci"
                     )
                 )

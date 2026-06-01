@@ -2,6 +2,7 @@
 
 import secrets
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, field_validator
@@ -10,16 +11,16 @@ from sqlalchemy.orm import Session
 from web.database import get_db
 from web.models import Subscription
 from web.telegram_service import TelegramService
-from web.routes.auth import verify_token
+from web.routes.auth import verify_token, verify_telegram_chat_id
+from web.routes.validators import validate_push_time, validate_frequency
 
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
 
+@lru_cache(maxsize=1)
 def _get_telegram_service() -> TelegramService:
-    """懒加载 TelegramService 实例"""
-    if not hasattr(_get_telegram_service, '_instance'):
-        _get_telegram_service._instance = TelegramService()
-    return _get_telegram_service._instance
+    """懒加载 TelegramService 实例（线程安全单例）"""
+    return TelegramService()
 
 
 class TelegramSubscribeRequest(BaseModel):
@@ -28,18 +29,7 @@ class TelegramSubscribeRequest(BaseModel):
     push_time: str = "09:00:00"
     timezone: str = "UTC"
 
-    @field_validator('push_time')
-    @classmethod
-    def validate_push_time(cls, v):
-        if len(v) != 8 or v[2] != ':' or v[5] != ':':
-            raise ValueError('push_time must be in HH:MM:SS format')
-        try:
-            hour, minute, second = map(int, v.split(':'))
-            if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
-                raise ValueError
-        except ValueError:
-            raise ValueError('push_time must be valid time (HH:MM:SS)')
-        return v
+    validate_push_time_v = field_validator('push_time')(validate_push_time)
 
 
 class TelegramUpdateRequest(BaseModel):
@@ -48,26 +38,8 @@ class TelegramUpdateRequest(BaseModel):
     categories: Optional[List[str]] = None
     frequency: Optional[str] = None
 
-    @field_validator('push_time')
-    @classmethod
-    def validate_push_time(cls, v):
-        if v is not None:
-            if len(v) != 8 or v[2] != ':' or v[5] != ':':
-                raise ValueError('push_time must be in HH:MM:SS format')
-            try:
-                hour, minute, second = map(int, v.split(':'))
-                if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
-                    raise ValueError
-            except ValueError:
-                raise ValueError('push_time must be valid time (HH:MM:SS)')
-        return v
-
-    @field_validator('frequency')
-    @classmethod
-    def validate_frequency(cls, v):
-        if v is not None and v not in ('daily', 'weekly'):
-            raise ValueError('frequency must be daily or weekly')
-        return v
+    validate_push_time_v = field_validator('push_time')(validate_push_time)
+    validate_frequency_v = field_validator('frequency')(validate_frequency)
 
 
 @router.post("/subscribe")
@@ -131,7 +103,7 @@ async def get_subscription(
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """查询 Telegram 订阅详情"""
+    """查询 Telegram 订阅详情（需 chat_id 匹配验证）"""
     subscription = db.query(Subscription).filter(
         Subscription.chat_id == chat_id
     ).first()
@@ -139,7 +111,7 @@ async def get_subscription(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    verify_token(subscription, token)
+    verify_telegram_chat_id(subscription, chat_id)
 
     return {
         "chat_id": subscription.chat_id,
@@ -160,7 +132,7 @@ async def update_subscription(
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """更新 Telegram 订阅偏好"""
+    """更新 Telegram 订阅偏好（需 chat_id 匹配验证）"""
     subscription = db.query(Subscription).filter(
         Subscription.chat_id == chat_id
     ).first()
@@ -168,7 +140,7 @@ async def update_subscription(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    verify_token(subscription, token)
+    verify_telegram_chat_id(subscription, chat_id)
 
     if request.push_time is not None:
         subscription.push_time = request.push_time
@@ -189,7 +161,7 @@ async def unsubscribe(
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """取消 Telegram 订阅"""
+    """取消 Telegram 订阅（需 chat_id 匹配验证）"""
     subscription = db.query(Subscription).filter(
         Subscription.chat_id == chat_id
     ).first()
@@ -197,7 +169,7 @@ async def unsubscribe(
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    verify_token(subscription, token)
+    verify_telegram_chat_id(subscription, chat_id)
 
     subscription.is_active = False
     db.commit()

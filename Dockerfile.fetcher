@@ -3,11 +3,11 @@ FROM python:3.11-slim
 WORKDIR /app
 
 COPY fetcher/requirements.txt /app/fetcher/requirements.txt
-COPY web/requirements.txt /app/web/requirements.txt
+COPY web/requirements-core.txt /app/web/requirements-core.txt
 
 RUN pip install --no-cache-dir \
     -r /app/fetcher/requirements.txt \
-    -r /app/web/requirements.txt
+    -r /app/web/requirements-core.txt
 
 COPY fetcher/ /app/fetcher/
 COPY web/ /app/web/

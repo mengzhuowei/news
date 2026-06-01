@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     last_pushed_at  DATETIME        DEFAULT NULL,
 
     UNIQUE INDEX idx_chat_id_unique (chat_id),
-    INDEX idx_email (email),
+    UNIQUE INDEX idx_email_unique (email),
     INDEX idx_token (confirm_token),
     INDEX idx_push_time (push_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

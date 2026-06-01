@@ -127,7 +127,7 @@ class TelegramService:
 
         date_str = datetime.now().strftime("%B %d, %Y")
         digest_title = "Daily" if frequency == "daily" else "Weekly"
-        message = f"📰 <b>{digest_title} News Digest</b>\n<i>{date_str}</i>\n\n"
+        message = f"📰 *{digest_title} News Digest*\n_{date_str}_\n\n"
 
         for i, article in enumerate(articles[:10], 1):
             source = article.get("source", "")
@@ -136,21 +136,22 @@ class TelegramService:
             summary = article.get("summary", "")
             url = article.get("url", "")
 
-            # 截断摘要
+            logger.debug(f"[Telegram] article[{i}] url: {url}")
+
             if len(summary) > 150:
                 summary = summary[:147] + "..."
 
-            message += f"<b>{i}. {_escape_html(title)}</b>\n"
-            message += f"<i>{_escape_html(source)} | {_escape_html(category)}</i>\n"
+            message += f"*{i}\\.\ {_escape_markdown(title)}*\n"
+            message += f"_{_escape_markdown(source + ' | ' + category)}_\n"
             if summary:
-                message += f"{_escape_html(summary)}\n"
+                message += f"{_escape_markdown(summary)}\n"
             if url:
-                message += f'<a href="{_escape_html(url)}">Read more</a>\n'
+                message += f"[Read more]({url})\n"
             message += "\n"
 
-        message += "---\n<i>Sent by News Aggregator Bot</i>"
+        message += "\-\-\-\n_Sent by News Aggregator Bot_"
 
-        return await self.send_message(chat_id, message)
+        return await self.send_message(chat_id, message, parse_mode="MarkdownV2")
 
     async def set_my_commands(self, commands: List[dict]) -> bool:
         """设置 Bot 命令菜单"""
@@ -178,3 +179,15 @@ def _escape_html(text: str) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+def _escape_markdown(text: str) -> str:
+    """转义 Telegram MarkdownV2 特殊字符"""
+    special_chars = [
+        '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|',
+        '{', '}', '.', '!',
+    ]
+    result = text
+    for char in special_chars:
+        result = result.replace(char, f"\\{char}")
+    return result

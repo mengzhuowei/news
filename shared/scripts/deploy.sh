@@ -29,7 +29,7 @@ fi
 ssh "${SSH_OPTS[@]}" "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p ${REMOTE_DIR}"
 
 # 同步 dist 目录（SSH 选项必须通过 -e 参数传递给 rsync）
-rsync -avz --delete -e "ssh ${SSH_OPTS[*]}" \
+rsync -avz --delete -e "ssh ${SSH_OPTS[@]}" \
     dist/ \
     "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/"
 

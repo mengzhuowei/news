@@ -45,8 +45,8 @@
     <!-- Login Form -->
     <div id="loginForm" class="login-form">
         <h2 style="margin-bottom: 1rem;">Admin Login</h2>
-        <input type="text" id="username" placeholder="Username" value="admin">
-        <input type="password" id="password" placeholder="Password">
+        <input type="text" id="username" placeholder="Username" autocomplete="username">
+        <input type="password" id="password" placeholder="Password" autocomplete="current-password">
         <button class="btn btn-primary" onclick="login()">Login</button>
     </div>
 
@@ -97,50 +97,78 @@
     </div>
 
     <script>
-        let auth = localStorage.getItem('admin_auth') || '';
-
         function escapeHtml(str) {
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
         }
 
-        function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            auth = 'Basic ' + btoa(unescape(encodeURIComponent(username + ':' + password)));
-            localStorage.setItem('admin_auth', auth);
-            fetch('/api/admin/stats', { headers: { 'Authorization': auth } })
-                .then(r => { if (!r.ok) throw new Error('Unauthorized'); return r.json(); })
-                .then(data => {
-                    document.getElementById('loginForm').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
-                    renderStats(data);
-                    loadArticles();
-                    loadLogs();
-                })
-                .catch(() => { auth = ''; localStorage.removeItem('admin_auth'); alert('Login failed'); });
+        async function apiFetch(url, options = {}) {
+            const resp = await fetch(url, { ...options, credentials: 'same-origin' });
+            if (resp.status === 401) {
+                showLogin();
+                throw new Error('Session expired');
+            }
+            return resp;
         }
 
-        function logout() {
-            auth = '';
-            localStorage.removeItem('admin_auth');
+        function showLogin() {
             document.getElementById('dashboard').classList.add('hidden');
             document.getElementById('loginForm').classList.remove('hidden');
         }
 
-        // 页面加载时尝试自动登录
-        if (auth) {
-            fetch('/api/admin/stats', { headers: { 'Authorization': auth } })
-                .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-                .then(data => {
-                    document.getElementById('loginForm').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
+        function showDashboard() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const resp = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ username, password }),
+                });
+                if (!resp.ok) {
+                    alert('Login failed');
+                    return;
+                }
+                showDashboard();
+                await loadDashboard();
+            } catch {
+                alert('Login failed');
+            }
+        }
+
+        async function logout() {
+            await apiFetch('/api/admin/logout', { method: 'POST' });
+            showLogin();
+        }
+
+        async function checkSession() {
+            try {
+                const resp = await apiFetch('/api/admin/stats');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    showDashboard();
                     renderStats(data);
                     loadArticles();
                     loadLogs();
-                })
-                .catch(() => { auth = ''; localStorage.removeItem('admin_auth'); });
+                }
+            } catch {
+                showLogin();
+            }
+        }
+
+        async function loadDashboard() {
+            const resp = await apiFetch('/api/admin/stats');
+            const data = await resp.json();
+            renderStats(data);
+            loadArticles();
+            loadLogs();
         }
 
         function renderStats(data) {
@@ -157,7 +185,7 @@
         }
 
         function loadArticles() {
-            fetch('/api/admin/articles?limit=20', { headers: { 'Authorization': auth } })
+            apiFetch('/api/admin/articles?limit=20')
                 .then(r => r.json())
                 .then(data => {
                     const tbody = document.getElementById('articlesTable');
@@ -176,7 +204,7 @@
         }
 
         function loadLogs() {
-            fetch('/api/admin/fetch/logs?limit=10', { headers: { 'Authorization': auth } })
+            apiFetch('/api/admin/fetch/logs?limit=10')
                 .then(r => r.json())
                 .then(data => {
                     const tbody = document.getElementById('logsTable');
@@ -194,17 +222,17 @@
 
         function deleteArticle(id) {
             if (!confirm('Delete this article?')) return;
-            fetch(`/api/admin/articles/${id}`, { method: 'DELETE', headers: { 'Authorization': auth } })
+            apiFetch(`/api/admin/articles/${id}`, { method: 'DELETE' })
                 .then(() => loadArticles());
         }
 
         function triggerBuild() {
             document.getElementById('buildStatus').textContent = 'Building...';
-            fetch('/api/admin/build', { method: 'POST', headers: { 'Authorization': auth } })
+            apiFetch('/api/admin/build', { method: 'POST' })
                 .then(r => r.json())
                 .then(() => {
                     let elapsed = 0;
-                    const maxWait = 300000; // 5 分钟超时
+                    const maxWait = 300000;
                     const check = setInterval(() => {
                         elapsed += 2000;
                         if (elapsed >= maxWait) {
@@ -212,7 +240,7 @@
                             document.getElementById('buildStatus').textContent = 'Timeout';
                             return;
                         }
-                        fetch('/api/admin/build/status', { headers: { 'Authorization': auth } })
+                        apiFetch('/api/admin/build/status')
                             .then(r => r.json())
                             .then(s => {
                                 document.getElementById('buildStatus').textContent = s.status;
@@ -231,10 +259,12 @@
 
         function cleanupArticles() {
             if (!confirm('Remove articles older than 7 days?')) return;
-            fetch('/api/admin/articles/cleanup', { method: 'POST', headers: { 'Authorization': auth } })
+            apiFetch('/api/admin/articles/cleanup', { method: 'POST' })
                 .then(r => r.json())
                 .then(d => { alert(`Removed ${d.removed_db} articles`); loadArticles(); loadLogs(); });
         }
+
+        checkSession();
     </script>
 </body>
 </html>
