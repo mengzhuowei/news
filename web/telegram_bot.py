@@ -365,46 +365,6 @@ class NewsTelegramBot:
             )
         )
 
-    async def _handle_subscribe_confirm(self, query, chat_id: int):
-        selected = _pending_selections.pop(chat_id)
-
-        with get_session() as db:
-            existing = db.query(Subscription).filter(
-                Subscription.chat_id == chat_id
-            ).first()
-
-            if existing:
-                if existing.is_active:
-                    await query.edit_message_text("✅ You're already subscribed!")
-                    return
-                existing.is_active = True
-                existing.categories = selected
-                existing.confirmed_at = datetime.now(timezone.utc)
-            else:
-                subscription = Subscription(
-                    chat_id=chat_id,
-                    categories=selected,
-                    push_time="09:00:00",
-                    timezone="UTC",
-                    push_channel="telegram",
-                    is_active=True,
-                    confirm_token=secrets.token_urlsafe(32),
-                    confirmed_at=datetime.now(timezone.utc),
-                )
-                db.add(subscription)
-
-            cats_display = ", ".join(_escape_html(c) for c in selected) if selected else "all categories"
-            await query.edit_message_text(
-                f"🎉 <b>Subscribed!</b>\n\n"
-                f"You'll receive news from: <i>{cats_display}</i>\n\n"
-                "Commands:\n"
-                "/status - View subscription status\n"
-                "/settime HH:MM - Set push time\n"
-                "/categories - Manage categories\n"
-                "/stop - Unsubscribe",
-                parse_mode="HTML",
-            )
-
     async def _handle_timezone_callback(self, query, chat_id: int, data: str):
         timezone = data[3:]
         selected = _pending_selections.pop(chat_id)

@@ -52,9 +52,9 @@ async def run_backfill(dry_run: bool = False):
         async with sem:
             return await rewrite_article(summarizer, article_id, title, content)
 
-    for offset in range(0, total, BATCH_SIZE):
+    while True:
         with get_session() as db:
-            batch = db.query(Article).filter(Article.is_rewritten == False).offset(offset).limit(BATCH_SIZE).all()
+            batch = db.query(Article).filter(Article.is_rewritten == False).limit(BATCH_SIZE).all()
             if not batch:
                 break
             batch_data = [(a.id, a.title, a.content) for a in batch]

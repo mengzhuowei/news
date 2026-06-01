@@ -89,9 +89,9 @@ class PushScheduler:
         sub_tz_name = subscription.timezone or "UTC"
 
         try:
-            from zoneinfo import ZoneInfo
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
             user_tz = ZoneInfo(sub_tz_name)
-        except ImportError:
+        except (ImportError, ZoneInfoNotFoundError, KeyError):
             user_tz = timezone.utc
 
         local_now = now.astimezone(user_tz)

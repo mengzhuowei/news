@@ -297,13 +297,10 @@ async def trigger_build(admin: str = Depends(verify_credentials)):
         try:
             builder = SiteBuilder(output_dir)
             success = builder.build_all()
-            from web.database import SessionLocal
+            from web.database import get_session
             from web.models import Article as ArticleModel
-            db = SessionLocal()
-            try:
+            with get_session() as db:
                 articles_count = db.query(ArticleModel).count()
-            finally:
-                db.close()
             with _build_lock:
                 _build_status = {
                     "status": "success" if success else "failed",
