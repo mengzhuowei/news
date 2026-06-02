@@ -51,8 +51,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
@@ -71,6 +71,42 @@ services:
       - ./dist:/app/dist
     networks:
       - news-network
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SITE_BASEURL=${SITE_BASEURL:-}
+    volumes:
+      - ${DIST_DIR:-./dist}:/usr/share/nginx/html:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - webroot:/var/www/certbot
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - news-network
+
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    environment:
+      - SITE_BASEURL=${SITE_BASEURL:-}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-}
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - webroot:/var/www/certbot
+      - ./nginx/certbot-entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
   telegram-bot:
     build:
@@ -107,6 +143,11 @@ services:
       - SITE_BASEURL=${SITE_BASEURL:-}
     networks:
       - news-network
+
+volumes:
+  certbot-etc:
+  certbot-var:
+  webroot:
 
 networks:
   news-network:

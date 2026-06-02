@@ -1,0 +1,44 @@
+#!/bin/sh
+set -e
+
+RAW_DOMAIN=$(echo "$SITE_BASEURL" | sed -e 's|^https\?://||' -e 's|/.*$||')
+
+if [ -z "$RAW_DOMAIN" ]; then
+    echo "[nginx] ERROR: SITE_BASEURL is not set or does not contain a valid domain"
+    exit 1
+fi
+
+if echo "$RAW_DOMAIN" | grep -q '^www\.'; then
+    DOMAIN="$RAW_DOMAIN"
+    ROOT_DOMAIN=$(echo "$RAW_DOMAIN" | sed 's/^www\.//')
+else
+    DOMAIN="www.${RAW_DOMAIN}"
+    ROOT_DOMAIN="$RAW_DOMAIN"
+fi
+
+export DOMAIN
+export ROOT_DOMAIN
+
+echo "[nginx] Domain (www): $DOMAIN"
+echo "[nginx] Root domain: $ROOT_DOMAIN"
+
+envsubst '${DOMAIN} ${ROOT_DOMAIN}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+rm -f /etc/nginx/conf.d/default.conf.template
+
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
+    echo "[nginx] No SSL certificate found, creating self-signed dummy certificate..."
+    mkdir -p "$CERT_DIR"
+    openssl req -x509 -nodes -newkey rsa:2048 \
+        -keyout "$CERT_DIR/privkey.pem" \
+        -out "$CERT_DIR/fullchain.pem" \
+        -subj "/CN=${DOMAIN}" \
+        -days 1 2>/dev/null
+    echo "[nginx] Dummy certificate created. Certbot will replace it with a real one."
+fi
+
+echo "0 */6 * * * nginx -s reload" > /etc/crontabs/root
+crond
+
+echo "[nginx] Starting nginx..."
+exec nginx -g 'daemon off;'
