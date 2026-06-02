@@ -14,6 +14,7 @@ from loguru import logger
 SITE_TITLE_DEFAULT = "Global News Digest"
 SITE_BASEURL_DEFAULT = ""
 ADSENSE_CLIENT_ID_DEFAULT = ""
+GA_ID_DEFAULT = ""
 TELEGRAM_BOT_USERNAME_DEFAULT = ""
 ARTICLES_PER_PAGE = 20
 
@@ -25,6 +26,7 @@ class SiteBuilder:
         self.site_title = os.getenv("SITE_TITLE", SITE_TITLE_DEFAULT)
         self.site_baseurl = os.getenv("SITE_BASEURL", SITE_BASEURL_DEFAULT)
         self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
+        self.ga_id = os.getenv("GA_ID", GA_ID_DEFAULT)
         self.telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", TELEGRAM_BOT_USERNAME_DEFAULT)
         if not self.site_baseurl:
             logger.warning(
@@ -51,6 +53,7 @@ class SiteBuilder:
             "site_baseurl": self.site_baseurl,
             "site_url": site_url,
             "adsense_client_id": self.adsense_client_id,
+            "ga_id": self.ga_id,
             "telegram_bot_username": self.telegram_bot_username,
         }
         ctx.update(extra)

@@ -60,6 +60,13 @@
         .breadcrumb a:hover { color: #e94560; }
         .breadcrumb span { margin: 0 0.3rem; }
     </style>
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_id }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ ga_id }}');
+    </script>
     {% block head %}{% endblock %}
     {% if adsense_client_id %}
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_client_id }}" crossorigin="anonymous"></script>

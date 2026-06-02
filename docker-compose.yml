@@ -37,6 +37,7 @@ services:
       - UPDATE_INTERVAL=${UPDATE_INTERVAL:-15}
       - SITE_BASEURL=${SITE_BASEURL:-}
       - ADSENSE_CLIENT_ID=${ADSENSE_CLIENT_ID:-}
+      - GA_ID=${GA_ID:-}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
