@@ -393,3 +393,20 @@ def _escape_xml(text: str) -> str:
         .replace('"', "&quot;")
         .replace("'", "&#39;")
     )
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent
+    output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))
+
+    builder = SiteBuilder(output_dir)
+    success = builder.build_all()
+    if success:
+        print("站点构建成功")
+        sys.exit(0)
+    else:
+        print("站点构建失败", file=sys.stderr)
+        sys.exit(1)

@@ -51,8 +51,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
