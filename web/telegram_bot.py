@@ -78,22 +78,9 @@ class _TTLCache:
                 return []
             return list(value)
 
-_pending_selections = _TTLCache()
+_pending_selections: dict[int, list[str]] = {}
 
-COMMON_TIMEZONES = [
-    "America/New_York",
-    "America/Chicago",
-    "America/Denver",
-    "America/Los_Angeles",
-    "Europe/London",
-    "Europe/Paris",
-    "Europe/Moscow",
-    "Asia/Dubai",
-    "Asia/Shanghai",
-    "Asia/Tokyo",
-    "Australia/Sydney",
-    "Pacific/Auckland",
-]
+UTC_OFFSETS = list(range(-12, 15))
 
 
 def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
@@ -115,17 +102,16 @@ def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
 def _build_timezone_keyboard() -> InlineKeyboardMarkup:
     keyboard = []
     row = []
-    for i, tz in enumerate(COMMON_TIMEZONES):
-        label = tz.split("/", 1)[1].replace("_", " ")
-        row.append(InlineKeyboardButton(label, callback_data=f"tz_{tz}"))
-        if (i + 1) % 3 == 0:
+    for i, offset in enumerate(UTC_OFFSETS):
+        sign = "+" if offset >= 0 else ""
+        label = f"UTC{sign}{offset}"
+        callback = f"tz_UTC{sign}{offset}"
+        row.append(InlineKeyboardButton(label, callback_data=callback))
+        if (i + 1) % 6 == 0:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([
-        InlineKeyboardButton("⏭ Skip (UTC)", callback_data="tz_UTC")
-    ])
     return InlineKeyboardMarkup(keyboard)
 
 

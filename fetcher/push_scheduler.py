@@ -105,11 +105,18 @@ class PushScheduler:
         frequency = subscription.frequency or "daily"
         sub_tz_name = subscription.timezone or "UTC"
 
-        try:
-            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-            user_tz = ZoneInfo(sub_tz_name)
-        except (ImportError, ZoneInfoNotFoundError, KeyError):
-            user_tz = timezone.utc
+        # 处理 UTC 偏移格式，例如 UTC+5、UTC-3
+        if sub_tz_name.startswith("UTC") and len(sub_tz_name) > 3:
+            offset_str = sub_tz_name[3:]
+            sign = 1 if offset_str[0] == "+" else -1
+            hours = int(offset_str[1:])
+            user_tz = timezone(timedelta(hours=sign * hours))
+        else:
+            try:
+                from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+                user_tz = ZoneInfo(sub_tz_name)
+            except (ImportError, ZoneInfoNotFoundError, KeyError):
+                user_tz = timezone.utc
 
         local_now = now.astimezone(user_tz)
         local_hour, local_min = local_now.hour, local_now.minute
