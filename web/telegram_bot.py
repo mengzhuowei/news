@@ -192,6 +192,37 @@ def _build_timezone_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+_TIME_ROWS = 6  # buttons per row for hour/minute buttons
+
+
+def _build_hour_keyboard() -> InlineKeyboardMarkup:
+    keyboard = []
+    row = []
+    for h in range(24):
+        label = f"{h:02d}"
+        row.append(InlineKeyboardButton(label, callback_data=f"time_h_{h:02d}"))
+        if len(row) == _TIME_ROWS:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _build_minute_keyboard() -> InlineKeyboardMarkup:
+    keyboard = []
+    row = []
+    for m in range(0, 60, 5):
+        label = f":{m:02d}"
+        row.append(InlineKeyboardButton(label, callback_data=f"time_m_{m:02d}"))
+        if len(row) == _TIME_ROWS:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
+
 class NewsTelegramBot:
     """新闻聚合 Telegram Bot"""
 
@@ -318,8 +349,9 @@ class NewsTelegramBot:
 
         if not context.args or len(context.args) != 1:
             await update.message.reply_text(
-                "Usage: /settime HH:MM\n"
-                "Example: /settime 09:00"
+                "🕐 <b>Select the hour</b>",
+                parse_mode="HTML",
+                reply_markup=_build_hour_keyboard(),
             )
             return
 
@@ -395,6 +427,8 @@ class NewsTelegramBot:
             await self._handle_category_callback(query, chat_id, data)
         elif data.startswith("tz_"):
             await self._handle_timezone_callback(query, chat_id, data)
+        elif data.startswith("time_"):
+            await self._handle_time_callback(query, chat_id, context)
         elif data.startswith("confirm_"):
             await self._handle_confirm_callback(query, chat_id, data)
         elif data == "reactivate":
@@ -515,6 +549,47 @@ class NewsTelegramBot:
 
             await query.edit_message_reply_markup(
                 _build_category_keyboard(current_cats)
+            )
+
+    async def _handle_time_callback(self, query, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+        data = query.data
+
+        if data.startswith("time_h_"):
+            hour = int(data[7:])
+            context.chat_data["settime_hour"] = hour
+            await query.edit_message_text(
+                f"🕐 <b>Select minutes</b>\n\n"
+                f"Hour: <b>{hour:02d}</b>",
+                parse_mode="HTML",
+                reply_markup=_build_minute_keyboard(),
+            )
+
+        elif data.startswith("time_m_"):
+            minute = int(data[7:])
+            hour = context.chat_data.pop("settime_hour", None)
+            if hour is None:
+                await query.edit_message_text("⏳ Session expired, please use /settime again.")
+                return
+
+            time_str = f"{hour:02d}:{minute:02d}"
+
+            with get_session() as db:
+                subscription = db.query(Subscription).filter(
+                    Subscription.chat_id == chat_id
+                ).first()
+
+                if not subscription or not subscription.is_active:
+                    await query.edit_message_text(
+                        "You're not currently subscribed.\n"
+                        "Use /start to subscribe."
+                    )
+                    return
+
+                subscription.push_time = f"{time_str}:00"
+
+            await query.edit_message_text(
+                f"✅ Push time set to <b>{time_str}</b>",
+                parse_mode="HTML",
             )
 
     async def _handle_confirm_callback(self, query, chat_id: int, data: str):
