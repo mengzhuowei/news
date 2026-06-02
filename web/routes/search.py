@@ -151,6 +151,21 @@ async def search_page(
 
     total_pages = max(1, (total + page_size - 1) // page_size)
 
+    def _build_page_items():
+        items = []
+        window = 2
+        if total_pages <= 7:
+            return list(range(1, total_pages + 1))
+        items.append(1)
+        if page - window > 2:
+            items.append(None)
+        for p in range(max(2, page - window), min(total_pages, page + window) + 1):
+            items.append(p)
+        if page + window < total_pages - 1:
+            items.append(None)
+        items.append(total_pages)
+        return items
+
     ctx = {
         "site_title": SITE_TITLE,
         "site_baseurl": SITE_BASEURL,
@@ -168,6 +183,7 @@ async def search_page(
         "has_next": page < total_pages,
         "prev_url": f"/search/?q={q}&page={page - 1}" if page > 1 else None,
         "next_url": f"/search/?q={q}&page={page + 1}" if page < total_pages else None,
+        "page_items": _build_page_items(),
         "canonical_url": f"{_site_url()}/search/?q={q}" if q else f"{_site_url()}/search/",
     }
     html = _jinja_env.get_template("search.html").render(**ctx)
