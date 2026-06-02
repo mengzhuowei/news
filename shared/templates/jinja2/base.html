@@ -70,6 +70,13 @@
         .breadcrumb a:hover { color: #e94560; }
         .breadcrumb span { margin: 0 0.3rem; }
     </style>
+    <script>
+    document.addEventListener('error', function(e) {
+        if (e.target.tagName === 'IMG') {
+            e.target.style.display = 'none';
+        }
+    }, true);
+    </script>
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_id }}"></script>
     <script>
         window.dataLayer = window.dataLayer || [];

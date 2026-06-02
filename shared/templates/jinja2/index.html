@@ -57,8 +57,6 @@
             <div class="article-card article-card-side">
                 {% if article.image %}
                 <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
-                {% else %}
-                <a href="{{ article.permalink }}"><img class="article-card-img" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=news+article+placeholder+newspaper&image_size=landscape_4_3" alt="{{ article.title }}" loading="lazy"></a>
                 {% endif %}
                 <div class="article-card-body">
                     <span class="source-badge">{{ article.source }}</span>
