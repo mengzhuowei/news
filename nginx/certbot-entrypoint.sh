@@ -36,17 +36,22 @@ sleep 10
 
 request_certificate() {
     if [ -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
-        echo "[certbot] Found existing certificate, attempting renew..."
-        certbot renew --webroot -w /var/www/certbot --non-interactive
-    else
-        echo "[certbot] Requesting new certificate for $DOMAIN and $ROOT_DOMAIN..."
-        certbot certonly --webroot -w /var/www/certbot \
-            -d "$DOMAIN" \
-            -d "$ROOT_DOMAIN" \
-            --email "$CERT_EMAIL" \
-            --agree-tos \
-            --non-interactive
+        if openssl x509 -in "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" -noout -issuer 2>/dev/null | grep -qE "CN\s*=\s*${DOMAIN}\s*\$"; then
+            echo "[certbot] Existing certificate is self-signed (dummy). Removing and requesting real certificate..."
+            rm -rf "/etc/letsencrypt/live/${DOMAIN}" "/etc/letsencrypt/archive/${DOMAIN}" "/etc/letsencrypt/renewal/${DOMAIN}.conf" 2>/dev/null || true
+        else
+            echo "[certbot] Found existing Let's Encrypt certificate, attempting renew..."
+            certbot renew --webroot -w /var/www/certbot --non-interactive
+            return $?
+        fi
     fi
+    echo "[certbot] Requesting new certificate for $DOMAIN and $ROOT_DOMAIN..."
+    certbot certonly --webroot -w /var/www/certbot \
+        -d "$DOMAIN" \
+        -d "$ROOT_DOMAIN" \
+        --email "$CERT_EMAIL" \
+        --agree-tos \
+        --non-interactive
 }
 
 while :; do
