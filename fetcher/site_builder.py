@@ -401,6 +401,9 @@ def _escape_xml(text: str) -> str:
 if __name__ == "__main__":
     import sys
     from pathlib import Path
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).parent.parent / ".env")
 
     project_root = Path(__file__).parent.parent
     output_dir = Path(os.getenv("DIST_DIR", str(project_root / "dist")))

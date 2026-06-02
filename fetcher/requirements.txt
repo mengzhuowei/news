@@ -7,3 +7,4 @@ numpy>=1.24
 curl_cffi>=0.5
 trafilatura>=1.6
 openai>=1.0
+python-dotenv>=1.0
