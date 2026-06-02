@@ -80,6 +80,7 @@
     </header>
     <nav>
         <div class="container">
+            <a href="/">🏠 Home</a>
             {% for name, section in sections.items() %}
                 <a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a>
             {% endfor %}
