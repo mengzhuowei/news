@@ -14,20 +14,42 @@ from fetcher.summarizer import Summarizer
 from fetcher.content_enricher import ContentEnricher
 
 _CATEGORY_MAP = {
+    # 科技
     "technology": "technology",
     "artificial-intelligence": "technology",
     "machine-learning": "technology",
     "nlp": "technology",
     "computer-vision": "technology",
     "research": "technology",
+
+    # 商业 / 金融
     "business": "business",
-    "markets": "business",
-    "finance": "business",
-    "economics": "business",
+    "companies": "business",
+    "markets": "markets",
+    "finance": "finance",
+    "wealth": "finance",
+    "economics": "economics",
+
+    # 世界 / 地区
     "world": "world",
-    "politics": "world",
+    "uk": "world",
+    "us": "world",
+    "united-states": "world",
     "news": "world",
+
+    # 政治
+    "politics": "politics",
+
+    # 科学
     "science": "science",
+    "climate": "science",
+
+    # 独立分类
+    "top": "top",
+    "health": "health",
+    "culture": "culture",
+    "education": "education",
+    "sport": "sport",
 }
 
 BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
