@@ -292,11 +292,16 @@ class SiteBuilder:
             [a for arts in sections.values() for a in arts],
             key=lambda a: a["date"], reverse=True,
         )
+
+        has_image = [a for a in all_articles if a.get("image")]
+        no_image = [a for a in all_articles if not a.get("image")]
+
         template = self.env.get_template("index.html")
         ctx = self._base_ctx(
-            hero_article=all_articles[0] if all_articles else None,
-            hero_side_articles=all_articles[1:4],
-            latest_articles=all_articles[4:10],
+            hero_article=has_image[0] if has_image else None,
+            hero_side_articles=has_image[1:4] if len(has_image) > 1 else [],
+            latest_articles=has_image[4:10] if len(has_image) > 4 else (has_image[1:] if len(has_image) > 1 else []),
+            no_image_articles=no_image[:15],
             canonical_url=f"{self._site_url}/",
             sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )

@@ -55,9 +55,7 @@
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
             {% for article in hero_side_articles %}
             <div class="article-card article-card-side">
-                {% if article.image %}
                 <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
-                {% endif %}
                 <div class="article-card-body">
                     <span class="source-badge">{{ article.source }}</span>
                     <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
@@ -99,10 +97,14 @@
             {% endif %}
         </div>
 
-        <h3>Categories</h3>
-        <ul class="category-list">
-            {% for name, section in sections.items() %}
-            <li><a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a></li>
+        <h3>Latest Headlines</h3>
+        <ul class="text-news-list">
+            {% for article in no_image_articles %}
+            <li>
+                <div class="tn-source">{{ article.source }}</div>
+                <div class="tn-title"><a href="{{ article.permalink }}">{{ article.title }}</a></div>
+                <div class="tn-meta">{{ article.published_display }}</div>
+            </li>
             {% endfor %}
         </ul>
     </div>
