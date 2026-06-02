@@ -28,7 +28,7 @@ from web.telegram_service import TelegramService, _escape_html
 
 
 AVAILABLE_CATEGORIES = [
-    "top", "world", "uk", "technology", "business", "health",
+    "breaking-news", "world", "uk", "technology", "business", "health",
     "culture", "science", "politics", "education", "sport",
     "finance", "markets", "ai", "startups",
     "economics", "wealth", "companies", "united-states",
@@ -36,7 +36,7 @@ AVAILABLE_CATEGORIES = [
 ]
 
 CATEGORY_ICONS = {
-    "top": "📰",
+    "breaking-news": "📰",
     "world": "🌍",
     "uk": "🇬🇧",
     "technology": "💻",

@@ -19,7 +19,7 @@ TELEGRAM_BOT_USERNAME_DEFAULT = ""
 ARTICLES_PER_PAGE = 20
 
 CATEGORY_DISPLAY_NAMES = {
-    "top": "Top Stories",
+    "breaking-news": "Breaking News",
     "world": "World",
     "uk": "UK",
     "technology": "Technology",
@@ -212,7 +212,7 @@ class SiteBuilder:
         except Exception as e:
             logger.error(f"Failed to mark articles as built: {e}")
 
-    def _get_related_articles(self, article: dict, sections: dict, count: int = 5) -> list[dict]:
+    def _get_related_articles(self, article: dict, sections: dict, count: int = 6) -> list[dict]:
         same_category = sections.get(article["category"], [])
         related = [a for a in same_category if a["id"] != article["id"]]
         return related[:count]

@@ -45,7 +45,7 @@ _CATEGORY_MAP = {
     "climate": "science",
 
     # 独立分类
-    "top": "top",
+    "top": "breaking-news",
     "health": "health",
     "culture": "culture",
     "education": "education",
