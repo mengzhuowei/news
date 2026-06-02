@@ -31,21 +31,12 @@ until getent hosts nginx >/dev/null 2>&1; do
 done
 echo "[certbot] nginx resolves to: $(getent hosts nginx)"
 
-echo "[certbot] Waiting for nginx to listen on port 80..."
-i=0
-until wget -q --spider --timeout=5 "http://nginx/" >/dev/null 2>&1 || \
-      wget -q --spider --timeout=5 "http://nginx/.well-known/acme-challenge/" >/dev/null 2>&1; do
-    i=$((i + 1))
-    if [ $((i % 12)) -eq 0 ]; then
-        echo "[certbot] Still waiting for nginx (${i} attempts)..."
-    fi
-    sleep 5
-done
-echo "[certbot] nginx is ready."
+echo "[certbot] Giving nginx 10 seconds to fully start..."
+sleep 10
 
 request_certificate() {
     if [ -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
-        echo "[certbot] Found existing certificate directory, attempting renew..."
+        echo "[certbot] Found existing certificate, attempting renew..."
         certbot renew --webroot -w /var/www/certbot --non-interactive
     else
         echo "[certbot] Requesting new certificate for $DOMAIN and $ROOT_DOMAIN..."
