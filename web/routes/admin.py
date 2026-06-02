@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from loguru import logger
@@ -233,36 +233,6 @@ async def delete_article(
     db.delete(article)
     db.commit()
     return {"status": "deleted"}
-
-
-@router.post("/articles/cleanup")
-async def cleanup_articles(
-    days: int = Query(7, ge=1, le=90),
-    admin: str = Depends(verify_session),
-    db: Session = Depends(get_db),
-):
-    """清理过期文章（分批处理，需认证）"""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    removed_db = 0
-    batch_size = 500
-
-    while True:
-        articles = (
-            db.query(Article)
-            .filter(Article.published_at < cutoff)
-            .limit(batch_size)
-            .all()
-        )
-        if not articles:
-            break
-
-        for article in articles:
-            db.delete(article)
-        db.commit()
-
-        removed_db += len(articles)
-
-    return {"removed_db": removed_db}
 
 
 @router.get("/fetch/logs")

@@ -57,7 +57,6 @@
         <div class="card">
             <h2>Quick Actions</h2>
             <button class="btn btn-primary" onclick="triggerBuild()">Build Site</button>
-            <button class="btn btn-danger" onclick="cleanupArticles()">Cleanup Old Articles</button>
             <span id="buildStatus" style="margin-left: 1rem;"></span>
         </div>
 
@@ -255,13 +254,6 @@
                             });
                     }, 2000);
                 });
-        }
-
-        function cleanupArticles() {
-            if (!confirm('Remove articles older than 7 days?')) return;
-            apiFetch('/api/admin/articles/cleanup', { method: 'POST' })
-                .then(r => r.json())
-                .then(d => { alert(`Removed ${d.removed_db} articles`); loadArticles(); loadLogs(); });
         }
 
         checkSession();

@@ -63,6 +63,18 @@ async def root():
     return JSONResponse(content={"message": "News Aggregator API", "version": "1.0.0"})
 
 
+@app.get("/logo.png", include_in_schema=False)
+async def logo():
+    """返回站点 logo 图片"""
+    logo_path = DIST_DIR / "logo.png"
+    if logo_path.exists():
+        from fastapi.responses import FileResponse
+        return FileResponse(str(logo_path), media_type="image/png")
+    raise HTTPException(status_code=404)
+
+
+
+
 ADMIN_DIR = Path(__file__).parent.parent / "admin"
 
 

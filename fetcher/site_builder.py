@@ -1,6 +1,7 @@
 """Jinja2 静态站点构建器 — 从数据库生成静态 HTML"""
 
 import os
+import shutil
 import calendar
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -143,6 +144,9 @@ class SiteBuilder:
         try:
             self._refresh_config()
             self.output_dir.mkdir(parents=True, exist_ok=True)
+            static_logo = Path(__file__).parent.parent / "shared" / "static" / "logo.png"
+            if static_logo.exists():
+                shutil.copy2(static_logo, self.output_dir / "logo.png")
             sections = self._load_from_db()
 
             if not sections:
