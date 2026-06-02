@@ -76,23 +76,9 @@
     <img src="{{ page.image }}" alt="{{ page.title }}" width="800" loading="lazy" style="width: 100%; border-radius: 8px; margin-bottom: 0.75rem;">
     {% endif %}
 
-    {% if adsense_client_id %}
-    <div style="height:90px; overflow:hidden; margin-bottom: 0.75rem;">
-        <ins class="adsbygoogle" style="display:block" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="false"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-    </div>
-    {% endif %}
-
     <div class="content-body">
         {{ page.content_html | safe }}
     </div>
-
-    {% if adsense_client_id %}
-    <div style="height:90px; overflow:hidden; margin-top: 2rem;">
-        <ins class="adsbygoogle" style="display:block" data-ad-client="{{ adsense_client_id }}" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="false"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-    </div>
-    {% endif %}
 </article>
 
 {% if related_articles %}
