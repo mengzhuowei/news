@@ -187,11 +187,13 @@ class PushScheduler:
             return result
 
     def _build_permalink(self, article: Article) -> str:
-        """构建站内永久链接，回退到原始 URL"""
+        """构建站内永久链接（含日期路径），回退到原始 URL"""
         if self.site_baseurl:
             category = article.category or "uncategorized"
             slug = article.slug or f"article-{article.id}"
-            return f"{self.site_baseurl}/{category}/{slug}/"
+            date = article.published_at or article.created_at or datetime.now(timezone.utc)
+            date_path = date.strftime("%Y/%m/%d")
+            return f"{self.site_baseurl}/{category}/{date_path}/{slug}/"
         return article.url
 
     def _update_last_pushed(self, subscription_id: int):
