@@ -73,7 +73,7 @@ services:
       - news-network
 
   nginx:
-    image: nginx:alpine
+    image: nginx:stable
     restart: unless-stopped
     depends_on:
       - web
