@@ -55,6 +55,8 @@ _CATEGORY_MAP = {
 BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
 REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
+ARTICLE_RETENTION_DAYS = int(os.getenv("ARTICLE_RETENTION_DAYS", "7"))
+ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "true").lower() in ("1", "true", "yes")
 
 
 def make_slug(source: str, title: str, article_id: int = 0) -> str:
@@ -134,7 +136,8 @@ class FetchScheduler:
                     if saved_count > 0 and saved_count % BUILD_BATCH_SIZE == 0:
                         self._try_async_build(f"batch ({saved_count} saved)")
 
-            await asyncio.to_thread(self._cleanup_expired_articles, 7)
+            if ARTICLE_CLEANUP_ENABLED:
+                await asyncio.to_thread(self._cleanup_expired_articles, ARTICLE_RETENTION_DAYS)
 
             if saved_count > 0:
                 await asyncio.to_thread(self._build_static_site)
