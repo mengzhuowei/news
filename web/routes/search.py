@@ -3,9 +3,8 @@
 import os
 from pathlib import Path
 from urllib.parse import quote_plus
+import jinja2
 from fastapi import APIRouter, Query, Depends
-from fastapi.templating import Jinja2Templates
-from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
@@ -17,8 +16,11 @@ from web.models import Article
 router = APIRouter(tags=["search"])
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "shared" / "templates" / "jinja2"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-templates.env.filters["urlencode"] = lambda s: quote_plus(s or "")
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
+    autoescape=jinja2.select_autoescape(["html"]),
+)
+_jinja_env.filters["urlencode"] = lambda s: quote_plus(s or "")
 
 CATEGORY_DISPLAY_NAMES = {
     "breaking-news": "Breaking News",
@@ -106,7 +108,6 @@ async def search_articles_api(
 
 @router.get("/search/", response_class=HTMLResponse)
 async def search_page(
-    request: Request,
     q: str = Query("", max_length=200),
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
@@ -151,7 +152,6 @@ async def search_page(
     total_pages = max(1, (total + page_size - 1) // page_size)
 
     ctx = {
-        "request": request,
         "site_title": SITE_TITLE,
         "site_baseurl": SITE_BASEURL,
         "site_url": _site_url(),
@@ -170,4 +170,5 @@ async def search_page(
         "next_url": f"/search/?q={q}&page={page + 1}" if page < total_pages else None,
         "canonical_url": f"{_site_url()}/search/?q={q}" if q else f"{_site_url()}/search/",
     }
-    return templates.TemplateResponse("search.html", ctx)
+    html = _jinja_env.get_template("search.html").render(**ctx)
+    return HTMLResponse(content=html)
