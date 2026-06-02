@@ -81,7 +81,7 @@
     <nav>
         <div class="container">
             {% for name, section in sections.items() %}
-                <a href="/{{ name }}/">{{ name }} ({{ section.count }})</a>
+                <a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a>
             {% endfor %}
         </div>
     </nav>

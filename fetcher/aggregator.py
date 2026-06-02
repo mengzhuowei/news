@@ -7,6 +7,8 @@ from fetcher.fetchers.ft import FTWatcher
 from fetcher.fetchers.techcrunch import TechCrunchFetcher
 from fetcher.fetchers.economist import EconomistFetcher
 from fetcher.fetchers.arxiv import ArxivFetcher
+from fetcher.fetchers.nytimes import NYTFetcher
+from fetcher.fetchers.yahoo import YahooNewsFetcher
 
 
 class Aggregator:
@@ -21,6 +23,8 @@ class Aggregator:
             TechCrunchFetcher(),
             EconomistFetcher(),
             ArxivFetcher(),
+            NYTFetcher(),
+            YahooNewsFetcher(),
         ]
 
     async def close_all(self):

@@ -28,19 +28,35 @@ from web.telegram_service import TelegramService, _escape_html
 
 
 AVAILABLE_CATEGORIES = [
-    "world", "technology", "business", "science",
+    "top", "world", "uk", "technology", "business", "health",
+    "culture", "science", "politics", "education", "sport",
     "finance", "markets", "ai", "startups",
+    "economics", "wealth", "companies", "united-states",
+    "climate", "us",
 ]
 
 CATEGORY_ICONS = {
+    "top": "📰",
     "world": "🌍",
+    "uk": "🇬🇧",
     "technology": "💻",
     "business": "💼",
+    "health": "🏥",
+    "culture": "🎭",
     "science": "🔬",
+    "politics": "🏛️",
+    "education": "📚",
+    "sport": "⚽",
     "finance": "💰",
     "markets": "📈",
     "ai": "🤖",
     "startups": "🚀",
+    "economics": "📊",
+    "wealth": "💎",
+    "companies": "🏢",
+    "united-states": "🇺🇸",
+    "climate": "🌱",
+    "us": "🇺🇸",
 }
 
 _PENDING_TTL = 600
@@ -78,7 +94,7 @@ class _TTLCache:
                 return []
             return list(value)
 
-_pending_selections: dict[int, list[str]] = {}
+_pending_selections = _TTLCache()
 
 UTC_OFFSETS = list(range(-12, 15))
 

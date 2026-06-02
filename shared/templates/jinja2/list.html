@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}{{ section_name | capitalize }} News - {{ site_title }}{% endblock %}
-{% block description %}Latest {{ section_name }} news from BBC, Reuters, Bloomberg and more. Stay updated with the top {{ section_name }} stories.{% endblock %}
+{% block title %}{{ section_name_display }} News - {{ site_title }}{% endblock %}
+{% block description %}Latest {{ section_name_display }} news from BBC, Reuters, Bloomberg and more. Stay updated with the top {{ section_name_display }} stories.{% endblock %}
 
 {% block head %}
 {% if page and page > 2 %}
 <meta name="robots" content="noindex, follow">
 {% endif %}
-<meta property="og:title" content="{{ section_name | capitalize }} News - {{ site_title }}">
-<meta property="og:description" content="Latest {{ section_name }} news from BBC, Reuters, Bloomberg and more.">
+<meta property="og:title" content="{{ section_name_display }} News - {{ site_title }}">
+<meta property="og:description" content="Latest {{ section_name_display }} news from BBC, Reuters, Bloomberg and more.">
 <meta property="og:url" content="{{ canonical_url }}">
 <meta property="og:site_name" content="{{ site_title }}">
 <meta property="og:type" content="website">
@@ -28,7 +28,7 @@
 <link rel="next" href="{{ next_url }}">
 {% endif %}
 {% if site_baseurl %}
-<link rel="alternate" type="application/rss+xml" title="{{ site_title }} - {{ section_name | capitalize }} RSS Feed" href="{{ site_baseurl }}/{{ section_name }}/index.xml">
+<link rel="alternate" type="application/rss+xml" title="{{ site_title }} - {{ section_name_display }} RSS Feed" href="{{ site_baseurl }}/{{ section_name }}/index.xml">
 {% endif %}
 <script type="application/ld+json">
 {
@@ -36,7 +36,7 @@
     "@type": "BreadcrumbList",
     "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_url }}/"},
-        {"@type": "ListItem", "position": 2, "name": {{ section_name | capitalize | tojson }}, "item": "{{ site_url }}/{{ section_name }}/"}
+        {"@type": "ListItem", "position": 2, "name": {{ section_name_display | tojson }}, "item": "{{ site_url }}/{{ section_name }}/"}
     ]
 }
 </script>
@@ -45,9 +45,9 @@
 {% block content %}
 <nav class="breadcrumb" aria-label="Breadcrumb">
     <a href="/">Home</a><span>›</span>
-    <span>{{ section_name | capitalize }}</span>
+    <span>{{ section_name_display }}</span>
 </nav>
-<h1 style="margin-bottom: 1.5rem; text-transform: capitalize;">{{ section_name }}</h1>
+<h1 style="margin-bottom: 1.5rem;">{{ section_name_display }}</h1>
 
 {% for article in articles %}
 <div class="article-card" style="display: flex; gap: 1rem;">

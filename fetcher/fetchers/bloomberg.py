@@ -10,6 +10,8 @@ class BloombergFetcher(BaseFetcher):
         'technology': 'https://feeds.bloomberg.com/technology/news.rss',
         'business': 'https://feeds.bloomberg.com/business/news.rss',
         'politics': 'https://feeds.bloomberg.com/politics/news.rss',
+        'economics': 'https://feeds.bloomberg.com/economics/news.rss',
+        'wealth': 'https://feeds.bloomberg.com/wealth/news.rss',
     }
 
     def __init__(self):

@@ -18,6 +18,30 @@ GA_ID_DEFAULT = ""
 TELEGRAM_BOT_USERNAME_DEFAULT = ""
 ARTICLES_PER_PAGE = 20
 
+CATEGORY_DISPLAY_NAMES = {
+    "top": "Top Stories",
+    "world": "World",
+    "uk": "UK",
+    "technology": "Technology",
+    "business": "Business",
+    "health": "Health",
+    "culture": "Culture",
+    "science": "Science",
+    "politics": "Politics",
+    "education": "Education",
+    "sport": "Sport",
+    "finance": "Finance",
+    "markets": "Markets",
+    "ai": "AI",
+    "startups": "Startups",
+    "economics": "Economics",
+    "wealth": "Wealth",
+    "companies": "Companies",
+    "united-states": "United States",
+    "climate": "Climate",
+    "us": "U.S.",
+}
+
 
 class SiteBuilder:
     """Jinja2 静态站点构建器 — 从数据库生成静态 HTML"""
@@ -208,7 +232,7 @@ class SiteBuilder:
             canonical_url=article["permalink"],
             page_lang=article.get("language", "en"),
             related_articles=related_articles,
-            sections={k: {"count": len(v)} for k, v in sections.items()},
+            sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
 
@@ -240,8 +264,11 @@ class SiteBuilder:
         if page_num < total_pages:
             next_url = f"/{section_name}/page/{page_num + 1}/"
 
+        section_name_display = CATEGORY_DISPLAY_NAMES.get(section_name, section_name.capitalize())
+
         ctx = self._base_ctx(
             section_name=section_name,
+            section_name_display=section_name_display,
             articles=page_articles,
             page=page_num,
             total_pages=total_pages,
@@ -251,7 +278,7 @@ class SiteBuilder:
             prev_url=prev_url,
             next_url=next_url,
             section_image=articles[0]["image"] if articles and articles[0].get("image") else "",
-            sections={k: {"count": len(v)} for k, v in sections.items()},
+            sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
 
@@ -267,7 +294,7 @@ class SiteBuilder:
             hero_side_articles=all_articles[1:4],
             latest_articles=all_articles[4:10],
             canonical_url=f"{self._site_url}/",
-            sections={k: {"count": len(v)} for k, v in sections.items()},
+            sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         (self.output_dir / "index.html").write_text(
             template.render(**ctx), encoding="utf-8"
@@ -361,12 +388,13 @@ class SiteBuilder:
                     f'    <pubDate>{pub_date}</pubDate>\n'
                     f'  </item>'
                 )
+            section_name_display = CATEGORY_DISPLAY_NAMES.get(section_name, section_name.capitalize())
             cat_rss = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<rss version="2.0">\n<channel>\n'
-                f'  <title>{_escape_xml(self.site_title)} - {section_name.capitalize()}</title>\n'
+                f'  <title>{_escape_xml(self.site_title)} - {section_name_display}</title>\n'
                 f'  <link>{_escape_xml(self._site_url)}/{section_name}/</link>\n'
-                f'  <description>{_escape_xml(self.site_title)} - Latest {section_name.capitalize()} News</description>\n'
+                f'  <description>{_escape_xml(self.site_title)} - Latest {section_name_display} News</description>\n'
                 f'  <lastBuildDate>{now_rfc2822}</lastBuildDate>\n'
                 f'{chr(10).join(cat_items)}\n'
                 '</channel>\n</rss>'

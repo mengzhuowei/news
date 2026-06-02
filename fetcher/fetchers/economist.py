@@ -10,6 +10,8 @@ class EconomistFetcher(BaseFetcher):
         "finance": "https://www.economist.com/finance-and-economics/rss.xml",
         "science": "https://www.economist.com/science-and-technology/rss.xml",
         "world": "https://www.economist.com/international/rss.xml",
+        "business": "https://www.economist.com/business/rss.xml",
+        "united-states": "https://www.economist.com/united-states/rss.xml",
     }
 
     def __init__(self):

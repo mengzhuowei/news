@@ -92,7 +92,7 @@
         <h3>Categories</h3>
         <ul class="category-list">
             {% for name, section in sections.items() %}
-            <li><a href="/{{ name }}/">{{ name }} ({{ section.count }})</a></li>
+            <li><a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a></li>
             {% endfor %}
         </ul>
     </div>
