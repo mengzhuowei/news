@@ -54,10 +54,17 @@
         {% if hero_side_articles %}
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
             {% for article in hero_side_articles %}
-            <div class="article-card">
-                <span class="source-badge">{{ article.source }}</span>
-                <h2 style="font-size: 1rem;"><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+            <div class="article-card article-card-side">
+                {% if article.image %}
+                <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
+                {% else %}
+                <a href="{{ article.permalink }}"><img class="article-card-img" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=news+article+placeholder+newspaper&image_size=landscape_4_3" alt="{{ article.title }}" loading="lazy"></a>
+                {% endif %}
+                <div class="article-card-body">
+                    <span class="source-badge">{{ article.source }}</span>
+                    <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
                     <div class="article-meta">{{ article.published_display }}</div>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -66,12 +73,17 @@
         <h3 style="margin-bottom: 1rem;">Latest News</h3>
         {% for article in latest_articles %}
         <div class="article-card">
-            <span class="source-badge">{{ article.source }}</span>
-            <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
-            <div class="article-meta">
-                <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.category }} &middot; {{ article.author }}
+            {% if article.image %}
+            <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
+            {% endif %}
+            <div class="article-card-body">
+                <span class="source-badge">{{ article.source }}</span>
+                <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                <div class="article-meta">
+                    <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.category }} &middot; {{ article.author }}
+                </div>
+                <p class="article-summary">{{ article.summary }}</p>
             </div>
-            <p class="article-summary">{{ article.summary }}</p>
         </div>
         {% endfor %}
     </div>
