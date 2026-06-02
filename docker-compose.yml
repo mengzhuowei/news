@@ -84,7 +84,7 @@ services:
       - SITE_BASEURL=${SITE_BASEURL:-}
     volumes:
       - ${DIST_DIR:-./dist}:/usr/share/nginx/html:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ./nginx/entrypoint.sh:/entrypoint.sh:ro
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt

@@ -22,8 +22,7 @@ export ROOT_DOMAIN
 echo "[nginx] Domain (www): $DOMAIN"
 echo "[nginx] Root domain: $ROOT_DOMAIN"
 
-envsubst '${DOMAIN} ${ROOT_DOMAIN}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
-rm -f /etc/nginx/conf.d/default.conf.template
+envsubst '${DOMAIN} ${ROOT_DOMAIN}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
