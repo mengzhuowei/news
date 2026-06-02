@@ -33,8 +33,8 @@ echo "[certbot] nginx resolves to: $(getent hosts nginx)"
 
 echo "[certbot] Waiting for nginx to listen on port 80..."
 i=0
-until wget -q -O /dev/null --timeout=5 "http://nginx/.well-known/acme-challenge/healthcheck" 2>/dev/null || \
-      wget -q -O /dev/null --timeout=5 "http://nginx/" 2>/dev/null; do
+until wget -q --spider --timeout=5 "http://nginx/" >/dev/null 2>&1 || \
+      wget -q --spider --timeout=5 "http://nginx/.well-known/acme-challenge/" >/dev/null 2>&1; do
     i=$((i + 1))
     if [ $((i % 12)) -eq 0 ]; then
         echo "[certbot] Still waiting for nginx (${i} attempts)..."
