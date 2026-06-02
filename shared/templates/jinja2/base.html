@@ -31,10 +31,10 @@
         .article-card h2 a:hover { color: #e94560; }
         .article-meta { color: #666; font-size: 0.85rem; margin-bottom: 0.3rem; }
         .article-summary { color: #555; font-size: 0.9rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .article-card-side { padding: 1rem; }
-        .article-card-side .article-card-img { width: 100%; height: 160px; }
+        .article-card-side { padding: 1rem; flex-direction: column; }
+        .article-card-side .article-card-img { width: 100%; min-width: 0; height: 160px; }
         .article-card-side .article-card-body { margin-top: 0.5rem; }
-        .article-card-side h2 { font-size: 1rem; }
+        .article-card-side h2 { font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         @media (max-width: 640px) { .article-card { flex-direction: column; } .article-card-img { width: 100%; height: 180px; } }
         .hero { background: white; border-radius: 8px; overflow: hidden; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .hero img { width: 100%; height: 300px; object-fit: cover; }
