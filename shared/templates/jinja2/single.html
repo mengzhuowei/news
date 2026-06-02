@@ -84,13 +84,20 @@
 {% if related_articles %}
 <section style="margin-top: 2rem;">
     <h2 style="margin-bottom: 1rem; color: #1a1a2e;">Related Articles</h2>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+    <div class="article-grid">
         {% for article in related_articles %}
-        <div class="article-card">
-            <span class="source-badge">{{ article.source }}</span>
-            <h3 style="font-size: 1rem; margin-bottom: 0.3rem;"><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
-            <div class="article-meta">{{ article.published_display }}</div>
-            <p class="article-summary" style="font-size: 0.85rem;">{{ article.summary[:120] }}{% if article.summary | length > 120 %}...{% endif %}</p>
+        <div class="article-card article-card-side">
+            {% if article.image %}
+            <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
+            {% else %}
+            <a href="{{ article.permalink }}"><img class="article-card-img" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=news+article+placeholder+newspaper&image_size=landscape_4_3" alt="{{ article.title }}" loading="lazy"></a>
+            {% endif %}
+            <div class="article-card-body">
+                <span class="source-badge">{{ article.source }}</span>
+                <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                <div class="article-meta">{{ article.published_display }}</div>
+                <p class="article-summary">{{ article.summary[:120] }}{% if article.summary | length > 120 %}...{% endif %}</p>
+            </div>
         </div>
         {% endfor %}
     </div>

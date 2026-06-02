@@ -96,7 +96,63 @@ class _TTLCache:
 
 _pending_selections = _TTLCache()
 
-UTC_OFFSETS = list(range(-12, 15))
+TIMEZONE_OPTIONS = [
+    ("UTC-12", "UTC-12:00", "Pacific/Baker_Island"),
+    ("UTC-11", "UTC-11:00", "Pacific/Pago_Pago"),
+    ("UTC-10", "UTC-10:00", "Pacific/Honolulu"),
+    ("UTC-9", "UTC-09:00", "America/Anchorage"),
+    ("UTC-8", "UTC-08:00", "America/Los_Angeles"),
+    ("UTC-7", "UTC-07:00", "America/Denver"),
+    ("UTC-6", "UTC-06:00", "America/Chicago"),
+    ("UTC-5", "UTC-05:00", "America/New_York"),
+    ("UTC-4", "UTC-04:00", "America/Halifax"),
+    ("UTC-3", "UTC-03:00", "America/Sao_Paulo"),
+    ("UTC-2", "UTC-02:00", "Atlantic/South_Georgia"),
+    ("UTC-1", "UTC-01:00", "Atlantic/Azores"),
+    ("UTC+0", "UTC+00:00", "Europe/London"),
+    ("UTC+1", "UTC+01:00", "Europe/Paris"),
+    ("UTC+2", "UTC+02:00", "Europe/Athens"),
+    ("UTC+3", "UTC+03:00", "Europe/Moscow"),
+    ("UTC+4", "UTC+04:00", "Asia/Dubai"),
+    ("UTC+5", "UTC+05:00", "Asia/Karachi"),
+    ("UTC+5:30", "UTC+05:30", "Asia/Kolkata"),
+    ("UTC+6", "UTC+06:00", "Asia/Dhaka"),
+    ("UTC+7", "UTC+07:00", "Asia/Bangkok"),
+    ("UTC+8", "UTC+08:00", "Asia/Shanghai"),
+    ("UTC+9", "UTC+09:00", "Asia/Tokyo"),
+    ("UTC+10", "UTC+10:00", "Australia/Sydney"),
+    ("UTC+11", "UTC+11:00", "Pacific/Guadalcanal"),
+    ("UTC+12", "UTC+12:00", "Pacific/Auckland"),
+]
+
+CITY_ICONS = {
+    "Pacific/Baker_Island": "🏝️",
+    "Pacific/Pago_Pago": "🏝️",
+    "Pacific/Honolulu": "🌺",
+    "America/Anchorage": "🏔️",
+    "America/Los_Angeles": "🌉",
+    "America/Denver": "⛰️",
+    "America/Chicago": "🌽",
+    "America/New_York": "🗽",
+    "America/Halifax": "🍁",
+    "America/Sao_Paulo": "🌴",
+    "Atlantic/South_Georgia": "🐧",
+    "Atlantic/Azores": "🌊",
+    "Europe/London": "🇬🇧",
+    "Europe/Paris": "🗼",
+    "Europe/Athens": "🏛️",
+    "Europe/Moscow": "⛪",
+    "Asia/Dubai": "🏙️",
+    "Asia/Karachi": "🕌",
+    "Asia/Kolkata": "🇮🇳",
+    "Asia/Dhaka": "🇧🇩",
+    "Asia/Bangkok": "🛕",
+    "Asia/Shanghai": "🇨🇳",
+    "Asia/Tokyo": "🗼",
+    "Australia/Sydney": "🦘",
+    "Pacific/Guadalcanal": "🏝️",
+    "Pacific/Auckland": "🥝",
+}
 
 
 def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
@@ -115,15 +171,20 @@ def _build_category_keyboard(selected: list[str], prefix: str = "cat_",
     return InlineKeyboardMarkup(keyboard)
 
 
+_TZ_CALLBACK_TO_IANA: dict[str, str] = {}
+
 def _build_timezone_keyboard() -> InlineKeyboardMarkup:
+    global _TZ_CALLBACK_TO_IANA
+    _TZ_CALLBACK_TO_IANA.clear()
     keyboard = []
     row = []
-    for i, offset in enumerate(UTC_OFFSETS):
-        sign = "+" if offset >= 0 else ""
-        label = f"UTC{sign}{offset}"
-        callback = f"tz_UTC{sign}{offset}"
-        row.append(InlineKeyboardButton(label, callback_data=callback))
-        if (i + 1) % 6 == 0:
+    for i, (label, utc_str, iana) in enumerate(TIMEZONE_OPTIONS):
+        icon = CITY_ICONS.get(iana, "")
+        display = f"{icon} {label}"
+        cb_key = f"tz_{i}"
+        _TZ_CALLBACK_TO_IANA[cb_key] = iana
+        row.append(InlineKeyboardButton(display, callback_data=cb_key))
+        if (i + 1) % 3 == 0:
             keyboard.append(row)
             row = []
     if row:
@@ -370,7 +431,7 @@ class NewsTelegramBot:
         )
 
     async def _handle_timezone_callback(self, query, chat_id: int, data: str):
-        timezone = data[3:]
+        user_tz = _TZ_CALLBACK_TO_IANA.get(data, "UTC")
         selected = _pending_selections.pop(chat_id)
 
         with get_session() as db:
@@ -384,14 +445,14 @@ class NewsTelegramBot:
                     return
                 existing.is_active = True
                 existing.categories = selected
-                existing.timezone = timezone
+                existing.timezone = user_tz
                 existing.confirmed_at = datetime.now(timezone.utc)
             else:
                 subscription = Subscription(
                     chat_id=chat_id,
                     categories=selected,
                     push_time="09:00:00",
-                    timezone=timezone,
+                    timezone=user_tz,
                     push_channel="telegram",
                     is_active=True,
                     confirm_token=secrets.token_urlsafe(32),
@@ -400,7 +461,7 @@ class NewsTelegramBot:
                 db.add(subscription)
 
             cats_display = ", ".join(_escape_html(c) for c in selected) if selected else "all categories"
-            tz_display = timezone.replace("_", " ")
+            tz_display = user_tz.replace("_", " ")
             await query.edit_message_text(
                 f"🎉 <b>Subscribed!</b>\n\n"
                 f"You'll receive news from: <i>{cats_display}</i>\n"
