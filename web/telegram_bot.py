@@ -23,7 +23,7 @@ except ImportError:
     logger.warning("[TelegramBot] python-telegram-bot not installed. Bot commands disabled.")
 
 from web.database import get_session
-from web.models import Subscription
+from web.models import Subscription, Article
 from web.telegram_service import TelegramService, _escape_html
 
 
@@ -195,6 +195,20 @@ def _build_timezone_keyboard() -> InlineKeyboardMarkup:
 _TIME_ROWS = 6  # buttons per row for hour/minute buttons
 
 
+_SITE_BASEURL = os.getenv("SITE_BASEURL", "").rstrip("/")
+
+
+def _build_permalink(article: Article) -> str:
+    """构建站内永久链接，回退到原始 URL"""
+    if _SITE_BASEURL:
+        category = article.category or "uncategorized"
+        slug = article.slug or f"article-{article.id}"
+        date = article.published_at or article.created_at or datetime.now(timezone.utc)
+        date_path = date.strftime("%Y/%m/%d")
+        return f"{_SITE_BASEURL}/{category}/{date_path}/{slug}/"
+    return article.url
+
+
 def _build_hour_keyboard() -> InlineKeyboardMarkup:
     keyboard = []
     row = []
@@ -241,6 +255,7 @@ class NewsTelegramBot:
     async def _post_init(self, application):
         commands = [
             {"command": "start", "description": "Subscribe / Welcome"},
+            {"command": "latest", "description": "Latest news"},
             {"command": "status", "description": "View subscription status"},
             {"command": "settime", "description": "Set push time (e.g. /settime 09:00)"},
             {"command": "categories", "description": "Manage categories"},
@@ -251,6 +266,7 @@ class NewsTelegramBot:
 
     def _setup_handlers(self):
         self.app.add_handler(CommandHandler("start", self.start))
+        self.app.add_handler(CommandHandler("latest", self.latest))
         self.app.add_handler(CommandHandler("stop", self.stop))
         self.app.add_handler(CommandHandler("status", self.status))
         self.app.add_handler(CommandHandler("settime", self.settime))
@@ -294,6 +310,42 @@ class NewsTelegramBot:
                     ),
                     parse_mode="HTML",
                 )
+
+    async def latest(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        chat_id = update.effective_chat.id
+
+        with get_session() as db:
+            articles = db.query(Article).filter(
+                Article.is_rewritten == True
+            ).order_by(
+                Article.created_at.desc()
+            ).limit(10).all()
+
+            if not articles:
+                await update.message.reply_text("No articles available yet. Please check back later.")
+                return
+
+            date_str = datetime.now().strftime("%B %d, %Y")
+            message = f"📰 <b>Latest News</b>\n<i>{date_str}</i>\n\n"
+
+            for i, article in enumerate(articles, 1):
+                url = _build_permalink(article) if _SITE_BASEURL else article.url
+                source = _escape_html(article.source or "")
+                category = _escape_html(article.category or "")
+                title = _escape_html(article.title or "Untitled")
+                summary = _escape_html(article.summary or "")
+                if len(summary) > 150:
+                    summary = summary[:147] + "..."
+
+                message += f"<b>{i}. {title}</b>\n"
+                message += f"<i>{source} | {category}</i>\n"
+                if summary:
+                    message += f"{summary}\n"
+                message += f'<a href="{url}">Read more</a>\n\n'
+
+            message += "---\n<i>Sent by News Aggregator Bot</i>"
+
+            await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 
     async def stop(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
