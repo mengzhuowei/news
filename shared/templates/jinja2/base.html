@@ -23,6 +23,22 @@
         nav { background: #16213e; padding: 0.5rem 0; }
         nav a { color: #e0e0e0; text-decoration: none; margin-right: 1.5rem; font-size: 0.9rem; }
         nav a:hover { color: #e94560; }
+        .nav-container { display: flex; justify-content: space-between; align-items: center; }
+        .nav-links { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+        .nav-search-form { display: flex; gap: 4px; flex-shrink: 0; }
+        .nav-search-input {
+            padding: 5px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.85rem; background: rgba(255,255,255,0.1); color: white; outline: none; width: 180px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .nav-search-input::placeholder { color: #aaa; }
+        .nav-search-input:focus { border-color: #e94560; background: rgba(255,255,255,0.15); }
+        .nav-search-btn {
+            padding: 5px 10px; border-radius: 4px; border: none; background: #e94560;
+            color: white; cursor: pointer; font-size: 0.85rem;
+        }
+        .nav-search-btn:hover { background: #d63851; }
+        @media (max-width: 768px) { .nav-container { flex-direction: column; gap: 8px; } .nav-search-input { width: 140px; } }
         main { padding: 2rem 0; min-height: 60vh; }
         footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 1.5rem 0; margin-top: 2rem; }
         .article-card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 1rem; align-items: flex-start; }
@@ -107,11 +123,17 @@
         </div>
     </header>
     <nav>
-        <div class="container">
-            <a href="/">🏠 Home</a>
-            {% for name, section in sections.items() %}
-                <a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a>
-            {% endfor %}
+        <div class="container nav-container">
+            <div class="nav-links">
+                <a href="/">🏠 Home</a>
+                {% for name, section in sections.items() %}
+                    <a href="/{{ name }}/">{{ section.display_name }} ({{ section.count }})</a>
+                {% endfor %}
+            </div>
+            <form action="/search/" method="get" class="nav-search-form">
+                <input type="text" name="q" placeholder="Search news..." class="nav-search-input">
+                <button type="submit" class="nav-search-btn">🔍</button>
+            </form>
         </div>
     </nav>
     <main>

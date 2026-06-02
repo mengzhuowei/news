@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}{% if query %}Search: {{ query }} - {{ site_title }}{% else %}Search - {{ site_title }}{% endif %}{% endblock %}
+
+{% block description %}{% if query %}Search results for "{{ query }}" on {{ site_title }}{% else %}Search news articles on {{ site_title }}{% endif %}{% endblock %}
+
+{% block head %}
+{% if query %}
+<meta property="og:title" content="Search: {{ query }} - {{ site_title }}">
+<meta property="og:description" content="Search results for &quot;{{ query }}&quot;">
+{% else %}
+<meta property="og:title" content="Search - {{ site_title }}">
+{% endif %}
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta name="robots" content="{% if query %}noindex,follow{% else %}index,follow{% endif %}">
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <div class="search-header">
+        <form action="/search/" method="get" class="search-form">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search news articles..."
+                   class="search-input" autofocus>
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+    </div>
+
+    {% if query %}
+        <div class="search-meta">
+            <strong>{{ total }}</strong> result{% if total != 1 %}s{% endif %} found for "<strong>{{ query }}</strong>"
+        </div>
+
+        {% if articles %}
+            {% for article in articles %}
+            <div class="article-card">
+                {% if article.image %}
+                <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
+                {% endif %}
+                <div class="article-card-body">
+                    <span class="source-badge">{{ article.source }}</span>
+                    <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                    <div class="article-meta">
+                        <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time>
+                        &middot; {{ article.category }}
+                    </div>
+                    <p class="article-summary">{{ article.summary }}</p>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if has_prev %}
+                <a href="{{ prev_url }}">&laquo; Previous</a>
+                {% else %}
+                <span class="disabled">&laquo; Previous</span>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="current">{{ p }}</span>
+                    {% else %}
+                    <a href="/search/?q={{ query | urlencode }}&page={{ p }}">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if has_next %}
+                <a href="{{ next_url }}">Next &raquo;</a>
+                {% else %}
+                <span class="disabled">Next &raquo;</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="no-results">
+                <p>No articles found matching "<strong>{{ query }}</strong>".</p>
+                <p>Try different keywords or browse categories from the navigation bar above.</p>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="no-results">
+            <p>Enter a keyword above to search news articles.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .search-page { max-width: 800px; margin: 0 auto; }
+    .search-header { margin-bottom: 1.5rem; }
+    .search-form { display: flex; gap: 8px; }
+    .search-input {
+        flex: 1; padding: 12px 16px; border: 2px solid #ddd; border-radius: 8px;
+        font-size: 1rem; outline: none; transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: #e94560; }
+    .search-btn {
+        padding: 12px 24px; background: #e94560; color: white; border: none;
+        border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer;
+        transition: background 0.2s;
+    }
+    .search-btn:hover { background: #d63851; }
+    .search-meta { color: #666; font-size: 0.95rem; margin-bottom: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+    .no-results { text-align: center; padding: 3rem 1rem; color: #666; }
+    .no-results p { margin-bottom: 0.5rem; }
+    .pagination { display: flex; gap: 0.5rem; margin-top: 2rem; align-items: center; }
+    .pagination a, .pagination span {
+        padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none;
+        font-size: 0.9rem;
+    }
+    .pagination a { background: #e94560; color: white; }
+    .pagination a:hover { background: #d63851; }
+    .pagination span.disabled { background: #ddd; color: #999; }
+    .pagination span.current { background: #1a1a2e; color: white; }
+</style>
+{% endblock %}

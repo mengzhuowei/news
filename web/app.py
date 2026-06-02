@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from web.database import init_db
-from web.routes import subscribe, subscription, admin, telegram_subscribe
+from web.routes import subscribe, subscription, admin, telegram_subscribe, search
 
 
 @asynccontextmanager
@@ -50,6 +50,7 @@ app.include_router(subscribe.router)
 app.include_router(subscription.router)
 app.include_router(admin.router)
 app.include_router(telegram_subscribe.router)
+app.include_router(search.router)
 
 DIST_DIR = Path(os.getenv("DIST_DIR", str(Path(__file__).parent.parent / "dist")))
 
