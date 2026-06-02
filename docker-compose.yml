@@ -107,6 +107,8 @@ services:
       - webroot:/var/www/certbot
       - ./nginx/certbot-entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - news-network
 
   telegram-bot:
     build:
