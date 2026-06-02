@@ -36,9 +36,14 @@ if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
     echo "[nginx] Dummy certificate created. Certbot will replace it with a real one."
 fi
 
-echo "0 */6 * * * root nginx -s reload" > /etc/cron.d/nginx-reload
-chmod 0644 /etc/cron.d/nginx-reload
-cron
+(
+    while :; do
+        sleep 21600
+        if [ -f "$CERT_DIR/fullchain.pem" ]; then
+            nginx -s reload 2>/dev/null || true
+        fi
+    done
+) &
 
 echo "[nginx] Starting nginx..."
 exec nginx -g 'daemon off;'
