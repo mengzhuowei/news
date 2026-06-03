@@ -56,7 +56,7 @@ BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
 REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
 ARTICLE_RETENTION_DAYS = int(os.getenv("ARTICLE_RETENTION_DAYS", "7"))
-ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "true").lower() in ("1", "true", "yes")
+ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "false").lower() in ("1", "true", "yes")
 
 
 def make_slug(source: str, title: str, article_id: int = 0) -> str:
