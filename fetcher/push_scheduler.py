@@ -139,12 +139,15 @@ class PushScheduler:
         if last_pushed:
             if last_pushed.tzinfo is None:
                 last_pushed = last_pushed.replace(tzinfo=timezone.utc)
+            local_last_pushed = last_pushed.astimezone(user_tz)
 
             if frequency == "daily":
-                if (now - last_pushed) < timedelta(hours=20):
+                if local_now.date() == local_last_pushed.date():
                     return False
             elif frequency == "weekly":
-                if (now - last_pushed) < timedelta(days=6):
+                now_week = local_now.date().isocalendar()[1]
+                last_week = local_last_pushed.date().isocalendar()[1]
+                if local_now.year == local_last_pushed.year and now_week == last_week:
                     return False
 
         self._last_check_minute[sub_id] = last_key
