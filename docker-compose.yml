@@ -1,4 +1,4 @@
-services:
+﻿services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
@@ -43,6 +43,12 @@ services:
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'fetcher.scheduler' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - news-network
 
@@ -72,6 +78,12 @@ services:
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('localhost',8000)); s.close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - news-network
 
@@ -93,6 +105,12 @@ services:
       - certbot-var:/var/lib/letsencrypt
       - webroot:/var/www/certbot
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - news-network
 
@@ -110,6 +128,12 @@ services:
       - webroot:/var/www/certbot
       - ./nginx/certbot-entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /etc/letsencrypt/live/*/fullchain.pem 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - news-network
 
@@ -127,6 +151,12 @@ services:
       - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - SITE_BASEURL=${SITE_BASEURL:-}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'telegram_bot' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - news-network
 
@@ -148,6 +178,12 @@ services:
       - ARTICLE_CLEANUP_ENABLED=${ARTICLE_CLEANUP_ENABLED:-false}
       - ARTICLE_RETENTION_DAYS=${ARTICLE_RETENTION_DAYS:-7}
       - SITE_BASEURL=${SITE_BASEURL:-}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'push_scheduler' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - news-network
 
