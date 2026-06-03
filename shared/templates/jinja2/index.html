@@ -2,7 +2,7 @@
 
 {% block head %}
 <meta property="og:title" content="{{ site_title }}">
-<meta property="og:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
+<meta property="og:description" content="Curated news from BBC, Reuters, Bloomberg, The Economist, FT and more. Your daily digest of global headlines, analysis and breaking stories.">
 <meta property="og:url" content="{{ site_url }}/">
 <meta property="og:site_name" content="{{ site_title }}">
 <meta property="og:type" content="website">
@@ -13,10 +13,19 @@
 <meta name="twitter:card" content="summary">
 {% endif %}
 <meta name="twitter:title" content="{{ site_title }}">
-<meta name="twitter:description" content="Global news aggregation from BBC, Reuters, Bloomberg and more">
+<meta name="twitter:description" content="Curated news from BBC, Reuters, Bloomberg, The Economist, FT and more. Your daily digest of global headlines, analysis and breaking stories.">
 {% if hero_article and hero_article.image %}
 <meta name="twitter:image" content="{{ hero_article.image }}">
 {% endif %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_url }}/"}
+    ]
+}
+</script>
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -25,7 +34,7 @@
     "url": "{{ site_url }}/",
     "potentialAction": {
         "@type": "SearchAction",
-        "target": "{{ site_url }}/?q={search_term_string}",
+        "target": "{{ site_url }}/search/?q={search_term_string}",
         "query-input": "required name=search_term_string"
     }
 }

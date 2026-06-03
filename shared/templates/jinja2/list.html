@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{{ section_name_display }} News - {{ site_title }}{% endblock %}
-{% block description %}Latest {{ section_name_display }} news from BBC, Reuters, Bloomberg and more. Stay updated with the top {{ section_name_display }} stories.{% endblock %}
+{% block description %}Read the latest {{ section_name_display }} news and analysis curated from top sources including BBC, Reuters, Bloomberg, The Economist and more. Stay informed with breaking {{ section_name_display }} stories.{% endblock %}
 
 {% block head %}
 {% if page and page > 2 %}
@@ -37,6 +37,25 @@
     "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_url }}/"},
         {"@type": "ListItem", "position": 2, "name": {{ section_name_display | tojson }}, "item": "{{ site_url }}/{{ section_name }}/"}
+    ]
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": {{ (section_name_display + " News") | tojson }},
+    "description": "Latest {{ section_name_display }} news and analysis curated from top sources.",
+    "url": "{{ canonical_url }}",
+    "itemListElement": [
+        {% for article in articles %}
+        {
+            "@type": "ListItem",
+            "position": {{ loop.index + (page - 1) * 20 }},
+            "url": {{ article.permalink | tojson }},
+            "name": {{ article.title | tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
     ]
 }
 </script>
