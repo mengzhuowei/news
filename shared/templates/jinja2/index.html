@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
+<meta name="keywords" content="{{ site_categories_keywords }}, news, headlines, breaking news">
 <meta property="og:title" content="{{ site_title }}">
 <meta property="og:description" content="Curated news from BBC, Reuters, Bloomberg, The Economist, FT and more. Your daily digest of global headlines, analysis and breaking stories.">
 <meta property="og:url" content="{{ site_url }}/">
@@ -8,6 +9,7 @@
 <meta property="og:type" content="website">
 {% if hero_article and hero_article.image %}
 <meta property="og:image" content="{{ hero_article.image }}">
+<meta property="og:image:alt" content="{{ hero_article.title }}">
 <meta name="twitter:card" content="summary_large_image">
 {% else %}
 <meta name="twitter:card" content="summary">
@@ -16,6 +18,7 @@
 <meta name="twitter:description" content="Curated news from BBC, Reuters, Bloomberg, The Economist, FT and more. Your daily digest of global headlines, analysis and breaking stories.">
 {% if hero_article and hero_article.image %}
 <meta name="twitter:image" content="{{ hero_article.image }}">
+<meta name="twitter:image:alt" content="{{ hero_article.title }}">
 {% endif %}
 <script type="application/ld+json">
 {
@@ -24,6 +27,18 @@
     "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ site_url }}/"}
     ]
+}
+</script>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "{{ site_url }}/",
+    "name": {{ site_title | tojson }},
+    "isPartOf": {
+        "@id": "{{ site_url }}/#website"
+    },
+    "about": "news, headlines, breaking news, world news"
 }
 </script>
 <script type="application/ld+json">

@@ -1,26 +1,33 @@
 {% extends "base.html" %}
 
 {% block title %}{{ page.title }} - {{ site_title }}{% endblock %}
-{% block description %}{{ page.summary[:160] }}{% endblock %}
+{% block description %}{{ page_description }}{% endblock %}
 
 {% block head %}
 <meta name="author" content="{{ page.author }}">
+<meta name="news_keywords" content="{{ page.category }}, {{ page.source }}, {{ site_title }}">
+<meta property="article:tag" content="{{ page.category }}">
+<meta property="article:tag" content="{{ page.source }}">
+{% if page.image %}<meta name="thumbnail" content="{{ page.image }}">{% endif %}
 <meta property="og:title" content="{{ page.title }}">
-<meta property="og:description" content="{{ page.summary[:160] }}">
+<meta property="og:description" content="{{ page_description }}">
 <meta property="og:url" content="{{ permalink }}">
 <meta property="og:site_name" content="{{ site_title }}">
 {% if page.image %}
 <meta property="og:image" content="{{ page.image }}">
+<meta property="og:image:alt" content="{{ page.title }}">
 {% endif %}
 <meta property="og:type" content="article">
 <meta property="article:published_time" content="{{ page.published_iso }}">
 <meta property="article:author" content="{{ page.author }}">
 <meta property="article:section" content="{{ page.category }}">
+<meta property="article:publisher" content="{{ site_url }}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ page.title }}">
-<meta name="twitter:description" content="{{ page.summary[:160] }}">
+<meta name="twitter:description" content="{{ page_description }}">
 {% if page.image %}
 <meta name="twitter:image" content="{{ page.image }}">
+<meta name="twitter:image:alt" content="{{ page.title }}">
 {% endif %}
 <script type="application/ld+json">
 {
@@ -31,9 +38,11 @@
         "@id": {{ permalink | tojson }}
     },
     "headline": {{ page.title | tojson }},
+    "description": {{ page_description | tojson }},
     "datePublished": {{ page.published_iso | tojson }},
     "dateModified": {{ page.published_iso | tojson }},
     "author": {"@type": "Person", "name": {{ page.author | tojson }}},
+    "articleSection": {{ page.category | tojson }},
     "publisher": {
         "@type": "Organization",
         "name": {{ site_title | tojson }},

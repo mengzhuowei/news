@@ -10,14 +10,21 @@
     <link rel="icon" href="/logo.png">
     <meta property="og:locale" content="en_US">
     <meta name="theme-color" content="#1a1a2e">
+    <meta name="application-name" content="{{ site_title }}">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
     <link rel="dns-prefetch" href="//pagead2.googlesyndication.com">
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png">
+    <link rel="manifest" href="/manifest.json">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
         "@type": "Organization",
         "name": {{ site_title | tojson }},
         "url": "{{ site_url }}/",
-        "logo": "{{ site_url }}/logo.png"
+        "logo": "{{ site_url }}/logo.png"{% if twitter_site %},
+    "sameAs": ["https://twitter.com/{{ twitter_site.lstrip("@") }}"]{% endif %}
     }
     </script>
     <style>
@@ -117,6 +124,8 @@
         gtag('js', new Date());
         gtag('config', '{{ ga_id }}');
     </script>
+    {% if twitter_site %}<meta name="twitter:site" content="{{ twitter_site }}">{% endif %}
+    {% if twitter_creator %}<meta name="twitter:creator" content="{{ twitter_creator }}">{% endif %}
     {% block head %}{% endblock %}
     {% if adsense_client_id %}
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_client_id }}" crossorigin="anonymous"></script>

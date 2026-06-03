@@ -4,6 +4,7 @@
 {% block description %}Read the latest {{ section_name_display }} news and analysis curated from top sources including BBC, Reuters, Bloomberg, The Economist and more. Stay informed with breaking {{ section_name_display }} stories.{% endblock %}
 
 {% block head %}
+<meta name="keywords" content="{{ section_name_display }}, {{ section_name }} news, headlines, {{ site_title }}">
 {% if page and page > 2 %}
 <meta name="robots" content="noindex, follow">
 {% endif %}
@@ -14,12 +15,14 @@
 <meta property="og:type" content="website">
 {% if section_image %}
 <meta property="og:image" content="{{ section_image }}">
+<meta property="og:image:alt" content="{{ section_name_display }} News">
 <meta name="twitter:card" content="summary_large_image">
 {% else %}
 <meta name="twitter:card" content="summary">
 {% endif %}
 {% if section_image %}
 <meta name="twitter:image" content="{{ section_image }}">
+<meta name="twitter:image:alt" content="{{ section_name_display }} News">
 {% endif %}
 {% if has_prev %}
 <link rel="prev" href="{{ prev_url }}">

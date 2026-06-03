@@ -16,6 +16,8 @@ SITE_TITLE_DEFAULT = "Global News Digest"
 SITE_BASEURL_DEFAULT = ""
 ADSENSE_CLIENT_ID_DEFAULT = ""
 GA_ID_DEFAULT = ""
+TWITTER_USERNAME_DEFAULT = ""
+TWITTER_CREATOR_DEFAULT = ""
 TELEGRAM_BOT_USERNAME_DEFAULT = ""
 ARTICLES_PER_PAGE = 20
 
@@ -53,6 +55,8 @@ class SiteBuilder:
         self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
         self.ga_id = os.getenv("GA_ID", GA_ID_DEFAULT)
         self.telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", TELEGRAM_BOT_USERNAME_DEFAULT)
+        self.twitter_site = os.getenv("TWITTER_SITE", TWITTER_USERNAME_DEFAULT)
+        self.twitter_creator = os.getenv("TWITTER_CREATOR", TWITTER_CREATOR_DEFAULT)
         if not self.site_baseurl:
             logger.warning(
                 "SITE_BASEURL is empty; RSS and Sitemap will contain relative URLs. "
@@ -69,6 +73,8 @@ class SiteBuilder:
                 str(Path(__file__).parent.parent / "shared" / "templates" / "jinja2")
             ),
             autoescape=jinja2.select_autoescape(["html"]),
+            trim_blocks=True,
+            lstrip_blocks=True,
         )
 
     def _base_ctx(self, **extra) -> dict:
@@ -80,6 +86,8 @@ class SiteBuilder:
             "adsense_client_id": self.adsense_client_id,
             "ga_id": self.ga_id,
             "telegram_bot_username": self.telegram_bot_username,
+            "twitter_site": self.twitter_site,
+            "twitter_creator": self.twitter_creator,
         }
         ctx.update(extra)
         return ctx
@@ -87,6 +95,19 @@ class SiteBuilder:
     @property
     def _site_url(self) -> str:
         return self.site_baseurl or f"https://{self.site_title.lower().replace(' ', '-')}.com"
+
+    @staticmethod
+    def _smart_truncate(text: str, max_chars: int = 160) -> str:
+        """Truncate text at word boundary within max_chars for meta descriptions."""
+        if not text:
+            return ""
+        cleaned = " ".join(text.split())
+        if len(cleaned) <= max_chars:
+            return cleaned
+        cutoff = cleaned.rfind(" ", 0, max_chars - 3)
+        if cutoff == -1:
+            cutoff = max_chars
+        return cleaned[:cutoff] + "..."
 
     def _load_from_db(self) -> dict[str, list[dict]]:
         """从数据库读取文章，按分类组织（分批加载 + 释放 identity map 避免内存溢出）"""
@@ -113,6 +134,7 @@ class SiteBuilder:
                         "id": a.id,
                         "title": a.title or "Untitled",
                         "summary": a.summary or "",
+                        "description": self._smart_truncate(a.summary or "", 160),
                         "content": a.content or "",
                         "content_html": markdown.markdown(
                             a.content, extensions=["tables", "fenced_code"]
@@ -149,7 +171,18 @@ class SiteBuilder:
                 if key not in priority_order:
                     ordered[key] = val
             sections = ordered
+
         return sections
+
+    @staticmethod
+    def _all_categories_keywords(sections: dict) -> str:
+        """Build a comma-separated keyword string from all active categories."""
+        names = []
+        for k in sections.keys():
+            if k == "uncategorized":
+                continue
+            names.append(CATEGORY_DISPLAY_NAMES.get(k, k.capitalize()))
+        return ", ".join(names)
 
     def build_all(self) -> bool:
         try:
@@ -158,6 +191,7 @@ class SiteBuilder:
             static_logo = Path(__file__).parent.parent / "shared" / "static" / "logo.png"
             if static_logo.exists():
                 shutil.copy2(static_logo, self.output_dir / "logo.png")
+            self._build_manifest_json()
             sections = self._load_from_db()
 
             if not sections:
@@ -204,6 +238,30 @@ class SiteBuilder:
             logger.error(f"Build failed: {e}")
             return False
 
+    def _build_manifest_json(self):
+        """Generate a basic manifest.json for PWA / better bookmarking."""
+        import json
+        manifest = {
+            "name": self.site_title,
+            "short_name": self.site_title,
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#1a1a2e",
+            "theme_color": "#1a1a2e",
+            "description": f"{self.site_title} - Curated news from BBC, Reuters, Bloomberg and more",
+            "icons": [
+                {
+                    "src": "/logo.png",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        }
+        (self.output_dir / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+        )
+        logger.info("manifest.json generated")
+
     def _mark_articles_as_built(self, sections: dict[str, list[dict]]):
         """标记所有文章为已构建 — 使用 ID 而非 slug 防止碰撞误更新"""
         from web.database import get_session
@@ -242,6 +300,7 @@ class SiteBuilder:
 
         ctx = self._base_ctx(
             page=article,
+            page_description=article["description"],
             title=article["title"],
             permalink=article["permalink"],
             canonical_url=article["permalink"],
@@ -314,6 +373,7 @@ class SiteBuilder:
             latest_articles=has_image[4:10] if len(has_image) > 4 else (has_image[1:] if len(has_image) > 1 else []),
             no_image_articles=no_image[:15],
             canonical_url=f"{self._site_url}/",
+            site_categories_keywords=self._all_categories_keywords(sections),
             sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         (self.output_dir / "index.html").write_text(
@@ -431,6 +491,9 @@ class SiteBuilder:
             "Disallow: /admin/\n"
             "Disallow: /subscribe\n"
             "Disallow: /subscription/\n"
+            "Disallow: /*?q=\n"
+            "Disallow: /*?page=\n"
+            "Crawl-Delay: 10\n"
             f"Sitemap: {sitemap_url}\n"
         )
         (self.output_dir / "robots.txt").write_text(content, encoding="utf-8")
