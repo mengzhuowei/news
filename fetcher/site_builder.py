@@ -138,6 +138,17 @@ class SiteBuilder:
 
             for cat in sections:
                 sections[cat].sort(key=lambda a: a["date"], reverse=True)
+
+            # 调整导航分类顺序：top → breaking-news → 其余
+            priority_order = ["top", "breaking-news"]
+            ordered = {}
+            for key in priority_order:
+                if key in sections:
+                    ordered[key] = sections[key]
+            for key, val in sections.items():
+                if key not in priority_order:
+                    ordered[key] = val
+            sections = ordered
         return sections
 
     def build_all(self) -> bool:
