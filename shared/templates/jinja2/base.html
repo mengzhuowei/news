@@ -79,10 +79,11 @@
         .sidebar h3 { margin-bottom: 1rem; color: #1a1a2e; }
         .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-        .pagination { display: flex; gap: 0.5rem; margin-top: 2rem; }
-        .pagination a, .pagination span { padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; }
+        .pagination { display: flex; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap; overflow-x: auto; padding-bottom: 4px; }
+        .pagination a, .pagination span { padding: 0.5rem 0.9rem; border-radius: 4px; text-decoration: none; white-space: nowrap; }
         .pagination a { background: #e94560; color: white; }
         .pagination span { background: #ddd; color: #666; }
+        .pagination .pagi-dots { background: none; color: #999; padding: 0.5rem 0.3rem; letter-spacing: 2px; }
         .source-badge { display: inline-block; background: #e94560; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
         .category-list { list-style: none; }
         .category-list li { padding: 0.3rem 0; }
