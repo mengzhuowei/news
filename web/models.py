@@ -24,6 +24,8 @@ class Article(Base):
     slug = Column(String(256), default='')
     is_rewritten = Column(Boolean, default=False)
     is_built = Column(Boolean, default=False)
+    is_translated = Column(Boolean, default=False)
+    translations = Column(JSON, default=dict)
     published_at = Column(DateTime)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

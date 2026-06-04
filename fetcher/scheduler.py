@@ -11,6 +11,7 @@ from loguru import logger
 from fetcher.aggregator import Aggregator
 from fetcher.cleaner import ContentCleaner
 from fetcher.summarizer import Summarizer
+from fetcher.translator import Translator
 from fetcher.content_enricher import ContentEnricher
 
 _CATEGORY_MAP = {
@@ -55,6 +56,7 @@ _CATEGORY_MAP = {
 BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
 REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
+TRANSLATE_CONCURRENT = int(os.getenv("TRANSLATE_CONCURRENT", "2"))
 ARTICLE_RETENTION_DAYS = int(os.getenv("ARTICLE_RETENTION_DAYS", "7"))
 ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "false").lower() in ("1", "true", "yes")
 
@@ -75,6 +77,7 @@ class FetchScheduler:
         self.aggregator = Aggregator()
         self.cleaner = ContentCleaner()
         self.summarizer = Summarizer()
+        self.translator = Translator(concurrent=TRANSLATE_CONCURRENT)
         self.enricher = ContentEnricher(
             enabled=os.getenv("CONTENT_ENRICHMENT", "true").lower() == "true",
             max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "5")),
@@ -82,6 +85,7 @@ class FetchScheduler:
         self._build_lock = threading.Lock()
         self._build_run_lock = threading.Lock()
         self._last_build_at: Optional[datetime] = None
+        self._translate_semaphore = asyncio.Semaphore(TRANSLATE_CONCURRENT)
 
     async def fetch_and_process(self):
         """完整抓取流程：抓取 → 去重URL → 过滤已入库 → 充实 → 清洗 → 洗稿 → 入库 → 清理 → 构建"""
@@ -148,10 +152,11 @@ class FetchScheduler:
             logger.error(f"Fetch error: {e}")
 
     async def _process_with_rewrite(self, articles: list) -> int:
-        """并发洗稿 + 入库流水线"""
+        """并发洗稿 + 入库流水线，翻译异步触发不阻塞"""
         semaphore = asyncio.Semaphore(REWRITE_CONCURRENT)
         saved_count = 0
         count_lock = asyncio.Lock()
+        translate_tasks: list[asyncio.Task] = []
 
         async def _process_one(article):
             nonlocal saved_count
@@ -181,9 +186,57 @@ class FetchScheduler:
                 self._try_async_build(f"batch ({current_count} saved)")
                 logger.info(f"Progress: {current_count} articles saved")
 
+            # 异步翻译 — 不阻塞洗稿流程
+            if self.translator.enabled:
+                task = asyncio.create_task(
+                    self._translate_article_async(
+                        cleaned.title, cleaned.content, cleaned.summary, cleaned.url,
+                    )
+                )
+                translate_tasks.append(task)
+
         tasks = [_process_one(a) for a in articles]
         await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 等待所有翻译任务完成（不阻塞主流程的后续构建，但确保翻译结果写入 DB）
+        if translate_tasks:
+            logger.info(f"Waiting for {len(translate_tasks)} translation tasks to complete...")
+            await asyncio.gather(*translate_tasks, return_exceptions=True)
+
         return saved_count
+
+    async def _translate_article_async(
+        self, title: str, content: str, summary: str, url: str,
+    ):
+        """异步翻译单篇文章并更新数据库 — 受信号量控制并发"""
+        async with self._translate_semaphore:
+            try:
+                translations = await self.translator.translate_article(title, content, summary)
+                if translations:
+                    await asyncio.to_thread(
+                        self._update_translation_in_db, url, translations,
+                    )
+                    logger.info(f"[Translate] Completed for: {title[:50]}... ({len(translations)} languages)")
+                else:
+                    logger.warning(f"[Translate] No translations produced for: {title[:50]}...")
+            except Exception as e:
+                logger.error(f"[Translate] Failed for '{title[:50]}...': {e}")
+
+    def _update_translation_in_db(self, url: str, translations: dict):
+        """将翻译结果写入数据库并打上标记"""
+        from web.database import get_session
+        from web.models import Article as ArticleModel
+
+        try:
+            with get_session() as db:
+                article = db.query(ArticleModel).filter(ArticleModel.url == url).first()
+                if not article:
+                    logger.warning(f"[Translate] Article not found in DB: {url[:80]}")
+                    return
+                article.translations = translations
+                article.is_translated = True
+        except Exception as e:
+            logger.error(f"[Translate] DB update error for {url[:80]}: {e}")
 
     def _batch_check_db(self, articles: list) -> set:
         """批量查询已存在的 URL，一次 DB 查询替代 N 次单条查询"""
