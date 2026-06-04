@@ -57,6 +57,8 @@ BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
 REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
 TRANSLATE_CONCURRENT = int(os.getenv("TRANSLATE_CONCURRENT", "2"))
+TRANSLATE_BATCH_SIZE = int(os.getenv("TRANSLATE_BATCH_SIZE", "10"))
+TRANSLATE_INTERVAL_SECONDS = int(os.getenv("TRANSLATE_INTERVAL_SECONDS", "60"))
 ARTICLE_RETENTION_DAYS = int(os.getenv("ARTICLE_RETENTION_DAYS", "7"))
 ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "false").lower() in ("1", "true", "yes")
 
@@ -153,9 +155,8 @@ class FetchScheduler:
             logger.error(f"Fetch error: {e}")
 
     async def _process_with_rewrite(self, articles: list) -> int:
-        """并发洗稿 + 翻译 + 入库流水线"""
+        """并发洗稿 + 入库流水线"""
         semaphore = asyncio.Semaphore(REWRITE_CONCURRENT)
-        translate_semaphore = asyncio.Semaphore(TRANSLATE_CONCURRENT)
         saved_count = 0
         count_lock = asyncio.Lock()
 
@@ -175,20 +176,6 @@ class FetchScheduler:
             cleaned.rewritten = True
             cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
 
-            # 翻译到 6 种语言
-            if self.translator.api_key:
-                async with translate_semaphore:
-                    translation = await self.translator.translate_article(
-                        title=cleaned.title,
-                        summary=cleaned.summary,
-                        content=cleaned.content,
-                    )
-                    cleaned.translations = {
-                        "title": translation.title,
-                        "summary": translation.summary,
-                        "content": translation.content,
-                    }
-
             saved = await asyncio.to_thread(self._save_to_db, cleaned)
             if not saved:
                 return
@@ -204,6 +191,99 @@ class FetchScheduler:
         tasks = [_process_one(a) for a in articles]
         await asyncio.gather(*tasks, return_exceptions=True)
         return saved_count
+
+    async def translate_pending_articles(self):
+        """异步翻译流程：查询未翻译文章 → 翻译 → 更新数据库（独立于抓取流水线）"""
+        if not self.translator.api_key:
+            return
+
+        articles = await asyncio.to_thread(self._fetch_untranslated)
+        if not articles:
+            return
+
+        logger.info(f"[Translator] Found {len(articles)} untranslated articles, starting translation...")
+        semaphore = asyncio.Semaphore(TRANSLATE_CONCURRENT)
+        translated_count = 0
+
+        async def _translate_one(article_record):
+            nonlocal translated_count
+            async with semaphore:
+                try:
+                    translation = await self.translator.translate_article(
+                        title=article_record.title,
+                        summary=article_record.summary or '',
+                        content=article_record.content or '',
+                    )
+                    await asyncio.to_thread(
+                        self._update_translation, article_record.id, translation,
+                    )
+                    translated_count += 1
+                    if translated_count % 10 == 0:
+                        logger.info(f"[Translator] Progress: {translated_count}/{len(articles)}")
+                except Exception as e:
+                    logger.error(f"[Translator] Failed for article {article_record.id}: {e}")
+
+        tasks = [_translate_one(a) for a in articles]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(f"[Translator] Translation complete: {translated_count}/{len(articles)}")
+
+    def _fetch_untranslated(self) -> list:
+        """查询未翻译的文章（is_translated=False），限制批次大小"""
+        from web.database import get_session
+        from web.models import Article as ArticleModel
+
+        try:
+            with get_session() as db:
+                return (
+                    db.query(ArticleModel)
+                    .filter(ArticleModel.is_translated == False)  # noqa: E712
+                    .order_by(ArticleModel.created_at.desc())
+                    .limit(TRANSLATE_BATCH_SIZE)
+                    .all()
+                )
+        except Exception as e:
+            logger.error(f"[Translator] Fetch untranslated failed: {e}")
+            return []
+
+    def _update_translation(self, article_id: int, translation) -> None:
+        """将翻译结果更新到数据库"""
+        from web.database import get_session
+        from web.models import Article as ArticleModel
+
+        try:
+            with get_session() as db:
+                record = db.query(ArticleModel).filter(ArticleModel.id == article_id).first()
+                if not record:
+                    return
+
+                title_trans = translation.title
+                summary_trans = translation.summary
+                content_trans = translation.content
+
+                record.title_zh_cn = title_trans.get("zh_cn", "")
+                record.title_zh_tw = title_trans.get("zh_tw", "")
+                record.title_ja = title_trans.get("ja", "")
+                record.title_ru = title_trans.get("ru", "")
+                record.title_de = title_trans.get("de", "")
+                record.title_fr = title_trans.get("fr", "")
+
+                record.summary_zh_cn = summary_trans.get("zh_cn", "")
+                record.summary_zh_tw = summary_trans.get("zh_tw", "")
+                record.summary_ja = summary_trans.get("ja", "")
+                record.summary_ru = summary_trans.get("ru", "")
+                record.summary_de = summary_trans.get("de", "")
+                record.summary_fr = summary_trans.get("fr", "")
+
+                record.content_zh_cn = content_trans.get("zh_cn", "")
+                record.content_zh_tw = content_trans.get("zh_tw", "")
+                record.content_ja = content_trans.get("ja", "")
+                record.content_ru = content_trans.get("ru", "")
+                record.content_de = content_trans.get("de", "")
+                record.content_fr = content_trans.get("fr", "")
+
+                record.is_translated = True
+        except Exception as e:
+            logger.error(f"[Translator] Update article {article_id} failed: {e}")
 
     def _batch_check_db(self, articles: list) -> set:
         """批量查询已存在的 URL，一次 DB 查询替代 N 次单条查询"""
@@ -320,11 +400,6 @@ class FetchScheduler:
 
         try:
             with get_session() as db:
-                translations = getattr(article, 'translations', {})
-                title_trans = translations.get("title", {})
-                summary_trans = translations.get("summary", {})
-                content_trans = translations.get("content", {})
-
                 record = ArticleModel(
                     url=article.url,
                     title=article.title,
@@ -337,25 +412,6 @@ class FetchScheduler:
                     is_rewritten=article.rewritten,
                     published_at=article.published,
                     slug=make_slug(article.source, article.title, 0),
-                    # 翻译字段
-                    title_zh_cn=title_trans.get("zh_cn", ""),
-                    title_zh_tw=title_trans.get("zh_tw", ""),
-                    title_ja=title_trans.get("ja", ""),
-                    title_ru=title_trans.get("ru", ""),
-                    title_de=title_trans.get("de", ""),
-                    title_fr=title_trans.get("fr", ""),
-                    summary_zh_cn=summary_trans.get("zh_cn", ""),
-                    summary_zh_tw=summary_trans.get("zh_tw", ""),
-                    summary_ja=summary_trans.get("ja", ""),
-                    summary_ru=summary_trans.get("ru", ""),
-                    summary_de=summary_trans.get("de", ""),
-                    summary_fr=summary_trans.get("fr", ""),
-                    content_zh_cn=content_trans.get("zh_cn", ""),
-                    content_zh_tw=content_trans.get("zh_tw", ""),
-                    content_ja=content_trans.get("ja", ""),
-                    content_ru=content_trans.get("ru", ""),
-                    content_de=content_trans.get("de", ""),
-                    content_fr=content_trans.get("fr", ""),
                 )
                 db.add(record)
                 db.flush()
@@ -410,11 +466,29 @@ class FetchScheduler:
                 logger.error("Failed to build static site")
 
     async def run_continuously(self):
-        """持续运行调度器"""
+        """持续运行调度器 — 抓取与翻译并行独立运行"""
         logger.info(f"Scheduler started, interval={self.interval_minutes}min")
+
+        fetch_task = asyncio.create_task(self._fetch_loop())
+        translate_task = asyncio.create_task(self._translate_loop())
+
+        await asyncio.gather(fetch_task, translate_task)
+
+    async def _fetch_loop(self):
+        """抓取循环"""
         while True:
             await self.fetch_and_process()
             await asyncio.sleep(self.interval_minutes * 60)
+
+    async def _translate_loop(self):
+        """翻译循环 — 独立于抓取流程，按固定间隔扫描未翻译文章"""
+        await asyncio.sleep(30)  # 启动延迟，等待首批文章入库
+        while True:
+            try:
+                await self.translate_pending_articles()
+            except Exception as e:
+                logger.error(f"[Translator] Loop error: {e}")
+            await asyncio.sleep(TRANSLATE_INTERVAL_SECONDS)
 
 
 async def main():

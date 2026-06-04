@@ -46,6 +46,7 @@ class Article(Base):
     content_ru = Column(MEDIUMTEXT, default='')
     content_de = Column(MEDIUMTEXT, default='')
     content_fr = Column(MEDIUMTEXT, default='')
+    is_translated = Column(Boolean, default=False)
 
     published_at = Column(DateTime)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

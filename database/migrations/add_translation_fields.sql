@@ -19,4 +19,7 @@ ALTER TABLE articles ADD COLUMN content_zh_tw MEDIUMTEXT DEFAULT NULL AFTER cont
 ALTER TABLE articles ADD COLUMN content_ja    MEDIUMTEXT DEFAULT NULL AFTER content_zh_tw;
 ALTER TABLE articles ADD COLUMN content_ru    MEDIUMTEXT DEFAULT NULL AFTER content_ja;
 ALTER TABLE articles ADD COLUMN content_de    MEDIUMTEXT DEFAULT NULL AFTER content_ru;
-ALTER TABLE articles ADD COLUMN content_fr    MEDIUMTEXT DEFAULT NULL AFTER content_de;
+ALTER TABLE articles ADD COLUMN content_fr MEDIUMTEXT DEFAULT NULL AFTER content_de;
+
+ALTER TABLE articles ADD COLUMN is_translated BOOLEAN DEFAULT FALSE AFTER content_fr;
+ALTER TABLE articles ADD INDEX idx_translated (is_translated);
