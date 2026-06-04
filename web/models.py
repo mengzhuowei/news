@@ -24,6 +24,29 @@ class Article(Base):
     slug = Column(String(256), default='')
     is_rewritten = Column(Boolean, default=False)
     is_built = Column(Boolean, default=False)
+
+    # 翻译字段：简体中文、繁体中文、日语、俄语、德语、法语
+    title_zh_cn = Column(String(1024), default='')
+    title_zh_tw = Column(String(1024), default='')
+    title_ja = Column(String(1024), default='')
+    title_ru = Column(String(1024), default='')
+    title_de = Column(String(1024), default='')
+    title_fr = Column(String(1024), default='')
+
+    summary_zh_cn = Column(Text, default='')
+    summary_zh_tw = Column(Text, default='')
+    summary_ja = Column(Text, default='')
+    summary_ru = Column(Text, default='')
+    summary_de = Column(Text, default='')
+    summary_fr = Column(Text, default='')
+
+    content_zh_cn = Column(MEDIUMTEXT, default='')
+    content_zh_tw = Column(MEDIUMTEXT, default='')
+    content_ja = Column(MEDIUMTEXT, default='')
+    content_ru = Column(MEDIUMTEXT, default='')
+    content_de = Column(MEDIUMTEXT, default='')
+    content_fr = Column(MEDIUMTEXT, default='')
+
     published_at = Column(DateTime)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

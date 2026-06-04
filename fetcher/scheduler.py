@@ -12,6 +12,7 @@ from fetcher.aggregator import Aggregator
 from fetcher.cleaner import ContentCleaner
 from fetcher.summarizer import Summarizer
 from fetcher.content_enricher import ContentEnricher
+from fetcher.translator import Translator
 
 _CATEGORY_MAP = {
     # 科技
@@ -55,6 +56,7 @@ _CATEGORY_MAP = {
 BUILD_BATCH_SIZE = int(os.getenv("BUILD_BATCH_SIZE", "20"))
 BUILD_COOLDOWN_SECONDS = int(os.getenv("BUILD_COOLDOWN_SECONDS", "60"))
 REWRITE_CONCURRENT = int(os.getenv("REWRITE_CONCURRENT", "3"))
+TRANSLATE_CONCURRENT = int(os.getenv("TRANSLATE_CONCURRENT", "2"))
 ARTICLE_RETENTION_DAYS = int(os.getenv("ARTICLE_RETENTION_DAYS", "7"))
 ARTICLE_CLEANUP_ENABLED = os.getenv("ARTICLE_CLEANUP_ENABLED", "false").lower() in ("1", "true", "yes")
 
@@ -78,6 +80,9 @@ class FetchScheduler:
         self.enricher = ContentEnricher(
             enabled=os.getenv("CONTENT_ENRICHMENT", "true").lower() == "true",
             max_concurrent=int(os.getenv("ENRICHMENT_CONCURRENT", "5")),
+        )
+        self.translator = Translator(
+            max_concurrent=TRANSLATE_CONCURRENT,
         )
         self._build_lock = threading.Lock()
         self._build_run_lock = threading.Lock()
@@ -148,8 +153,9 @@ class FetchScheduler:
             logger.error(f"Fetch error: {e}")
 
     async def _process_with_rewrite(self, articles: list) -> int:
-        """并发洗稿 + 入库流水线"""
+        """并发洗稿 + 翻译 + 入库流水线"""
         semaphore = asyncio.Semaphore(REWRITE_CONCURRENT)
+        translate_semaphore = asyncio.Semaphore(TRANSLATE_CONCURRENT)
         saved_count = 0
         count_lock = asyncio.Lock()
 
@@ -168,6 +174,20 @@ class FetchScheduler:
             cleaned.summary = rewritten_summary
             cleaned.rewritten = True
             cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
+
+            # 翻译到 6 种语言
+            if self.translator.api_key:
+                async with translate_semaphore:
+                    translation = await self.translator.translate_article(
+                        title=cleaned.title,
+                        summary=cleaned.summary,
+                        content=cleaned.content,
+                    )
+                    cleaned.translations = {
+                        "title": translation.title,
+                        "summary": translation.summary,
+                        "content": translation.content,
+                    }
 
             saved = await asyncio.to_thread(self._save_to_db, cleaned)
             if not saved:
@@ -300,6 +320,11 @@ class FetchScheduler:
 
         try:
             with get_session() as db:
+                translations = getattr(article, 'translations', {})
+                title_trans = translations.get("title", {})
+                summary_trans = translations.get("summary", {})
+                content_trans = translations.get("content", {})
+
                 record = ArticleModel(
                     url=article.url,
                     title=article.title,
@@ -312,6 +337,25 @@ class FetchScheduler:
                     is_rewritten=article.rewritten,
                     published_at=article.published,
                     slug=make_slug(article.source, article.title, 0),
+                    # 翻译字段
+                    title_zh_cn=title_trans.get("zh_cn", ""),
+                    title_zh_tw=title_trans.get("zh_tw", ""),
+                    title_ja=title_trans.get("ja", ""),
+                    title_ru=title_trans.get("ru", ""),
+                    title_de=title_trans.get("de", ""),
+                    title_fr=title_trans.get("fr", ""),
+                    summary_zh_cn=summary_trans.get("zh_cn", ""),
+                    summary_zh_tw=summary_trans.get("zh_tw", ""),
+                    summary_ja=summary_trans.get("ja", ""),
+                    summary_ru=summary_trans.get("ru", ""),
+                    summary_de=summary_trans.get("de", ""),
+                    summary_fr=summary_trans.get("fr", ""),
+                    content_zh_cn=content_trans.get("zh_cn", ""),
+                    content_zh_tw=content_trans.get("zh_tw", ""),
+                    content_ja=content_trans.get("ja", ""),
+                    content_ru=content_trans.get("ru", ""),
+                    content_de=content_trans.get("de", ""),
+                    content_fr=content_trans.get("fr", ""),
                 )
                 db.add(record)
                 db.flush()

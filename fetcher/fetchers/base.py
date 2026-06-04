@@ -31,6 +31,8 @@ class Article:
     image_url: Optional[str] = None
     language: str = "en"
     rewritten: bool = False
+    # 多语言翻译结果
+    translations: dict = field(default_factory=dict)
 
 
 class BaseFetcher(ABC):
