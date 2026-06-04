@@ -1,4 +1,4 @@
-﻿services:
+services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
@@ -43,6 +43,7 @@
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
+      - ./shared:/app/shared:ro
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'fetcher.scheduler' || exit 1"]
       interval: 30s
@@ -78,6 +79,7 @@
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
     volumes:
       - ./dist:/app/dist
+      - ./shared:/app/shared:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('localhost',8000)); s.close()\""]
       interval: 30s
