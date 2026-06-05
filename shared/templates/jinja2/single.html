@@ -66,9 +66,13 @@
     ]
 }
 </script>
-{#- Google Subscribe with Google (SWG) — Google News 订阅入口 - 仅在文章页加载
-    要求：站点需先在 Google News Publisher Center 注册并获得 isPartOfProductId
+{#- Google Subscribe with Google (SWG) — Google News 订阅入口
+    只在配置了 SWG_PRODUCT_ID 时才注入，避免污染未启用 SWG 的部署
+    拼接规则：isPartOfProductId = "<product_id>:<access_type>"
+    access_type 默认 openaccess（与 site_builder 中的 SWG_ACCESS_TYPE_DEFAULT 保持一致）
+    要求：站点需先在 Google News Publisher Center 注册并获得 product ID
     文档：https://developers.google.com/news/subscribe -#}
+{% if swg_product_id %}
 <script async type="application/javascript"
         src="https://news.google.com/swg/js/v1/swg-basic.js"></script>
 <script>
@@ -76,7 +80,7 @@
     basicSubscriptions.init({
       type: "NewsArticle",
       isPartOfType: ["Product"],
-      isPartOfProductId: "CAow4-zGDA:openaccess",
+      isPartOfProductId: "{{ swg_product_id }}:{{ swg_access_type | default('openaccess') }}",
       clientOptions: { theme: "light", lang: "en" },
     });
     // 把 SWG 按钮挂到文章顶部 #swg-follow-banner 容器
@@ -93,6 +97,7 @@
     })();
   });
 </script>
+{% endif %}
 {% endblock %}
 
 {% block content %}

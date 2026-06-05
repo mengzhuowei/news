@@ -16,6 +16,8 @@ SITE_TITLE_DEFAULT = "Global News Digest"
 SITE_BASEURL_DEFAULT = ""
 ADSENSE_CLIENT_ID_DEFAULT = ""
 GA_ID_DEFAULT = ""
+SWG_PRODUCT_ID_DEFAULT = ""
+SWG_ACCESS_TYPE_DEFAULT = "openaccess"  # 拆分后默认开 access
 TWITTER_USERNAME_DEFAULT = ""
 TWITTER_CREATOR_DEFAULT = ""
 TELEGRAM_BOT_USERNAME_DEFAULT = ""
@@ -54,6 +56,15 @@ class SiteBuilder:
         self.site_baseurl = os.getenv("SITE_BASEURL", SITE_BASEURL_DEFAULT)
         self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
         self.ga_id = os.getenv("GA_ID", GA_ID_DEFAULT)
+        self.swg_product_id = os.getenv("SWG_PRODUCT_ID", SWG_PRODUCT_ID_DEFAULT)
+        self.swg_access_type = os.getenv("SWG_ACCESS_TYPE", SWG_ACCESS_TYPE_DEFAULT)
+        # 校验：access_type 必须是白名单之一
+        if self.swg_access_type not in {"openaccess", "subscription", "metered"}:
+            logger.warning(
+                f"SWG_ACCESS_TYPE={self.swg_access_type!r} is not in "
+                "{openaccess, subscription, metered}, falling back to 'openaccess'"
+            )
+            self.swg_access_type = SWG_ACCESS_TYPE_DEFAULT
         self.telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", TELEGRAM_BOT_USERNAME_DEFAULT)
         self.twitter_site = os.getenv("TWITTER_SITE", TWITTER_USERNAME_DEFAULT)
         self.twitter_creator = os.getenv("TWITTER_CREATOR", TWITTER_CREATOR_DEFAULT)
@@ -85,6 +96,8 @@ class SiteBuilder:
             "site_url": site_url,
             "adsense_client_id": self.adsense_client_id,
             "ga_id": self.ga_id,
+            "swg_product_id": self.swg_product_id,
+            "swg_access_type": self.swg_access_type,
             "telegram_bot_username": self.telegram_bot_username,
             "twitter_site": self.twitter_site,
             "twitter_creator": self.twitter_creator,
