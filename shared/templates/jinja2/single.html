@@ -66,6 +66,21 @@
     ]
 }
 </script>
+{#- Google Subscribe with Google (SWG) — Google News 订阅入口 - 仅在文章页加载
+    要求：站点需先在 Google News Publisher Center 注册并获得 isPartOfProductId
+    文档：https://developers.google.com/news/subscribe -#}
+<script async type="application/javascript"
+        src="https://news.google.com/swg/js/v1/swg-basic.js"></script>
+<script>
+  (self.SWG_BASIC = self.SWG_BASIC || []).push( basicSubscriptions => {
+    basicSubscriptions.init({
+      type: "NewsArticle",
+      isPartOfType: ["Product"],
+      isPartOfProductId: "CAow4-zGDA:openaccess",
+      clientOptions: { theme: "light", lang: "en" },
+    });
+  });
+</script>
 {% endblock %}
 
 {% block content %}
