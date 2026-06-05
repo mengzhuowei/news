@@ -83,18 +83,35 @@
       isPartOfProductId: "{{ swg_product_id }}:{{ swg_access_type | default('openaccess') }}",
       clientOptions: { theme: "light", lang: "en" },
     });
-    // 把 SWG 按钮挂到文章顶部 #swg-follow-banner 容器
-    // SWG 会用 Shadow DOM 渲染按钮；容器本身只需保留位置
-    (function attachWhenReady() {
-      var host = document.getElementById('swg-follow-banner');
-      if (!host) return;
+
+    var banner = document.getElementById('swg-follow-banner');
+    if (!banner) return;
+
+    var attached = false;
+
+    // 尝试把 SWG 按钮挂到横幅容器
+    function tryAttach() {
       try {
-        basicSubscriptions.attachButton(host, { theme: 'light' });
+        basicSubscriptions.attachButton(banner, { theme: 'light' });
+        attached = true;
+        // SWG attachButton 成功 → 显示横幅 + 标记 SWG 已激活
+        banner.classList.remove('swg-follow-banner--hidden');
+        banner.classList.add('swg-follow-banner--visible', 'swg-follow-banner--swg-active');
       } catch (e) {
-        // SWG 尚未就绪则稍后重试
-        setTimeout(attachWhenReady, 300);
+        // SWG 尚未就绪，稍后重试
+        if (!attached && retries-- > 0) setTimeout(tryAttach, 300);
       }
-    })();
+    }
+
+    var retries = 10;  // 最多重试 10 次 × 300ms = 3 秒
+    tryAttach();
+
+    // 5 秒超时：如果 SWG 没注入按钮，彻底隐藏横幅（不显示空占位）
+    setTimeout(function () {
+      if (!attached) {
+        banner.remove();
+      }
+    }, 5000);
   });
 </script>
 {% endif %}
@@ -108,9 +125,10 @@
 </nav>
 
 {#- Google "Follow on Google News" 关注横幅
-    SWG 会用 Shadow DOM 注入按钮。如果 SWG 脚本被拦截或加载失败，
-    显示降级的"Follow on Google News"链接，避免空容器。 -#}
-<div id="swg-follow-banner" class="swg-follow-banner">
+    默认隐藏（swg-follow-banner--hidden），避免 SWG 未审核时显示空横幅。
+    SWG 注入按钮后 JS 会移除 hidden 类；5 秒超时后若仍无按钮则彻底隐藏。 -#}
+{% if swg_product_id %}
+<div id="swg-follow-banner" class="swg-follow-banner swg-follow-banner--hidden">
     <div class="swg-follow-text">
         <span class="swg-icon" aria-hidden="true">🔔</span>
         <div>
@@ -118,12 +136,8 @@
             <p>Get notified when {{ site_title }} publishes a new article</p>
         </div>
     </div>
-    <noscript>
-        <a class="swg-follow-link"
-           href="https://news.google.com/publications/CAAow4-zGDA?hl=en-US&gl=US&ceid=US:en"
-           target="_blank" rel="noopener">Open in Google News →</a>
-    </noscript>
 </div>
+{% endif %}
 <style>
 .swg-follow-banner {
     display: flex;
@@ -137,14 +151,30 @@
     padding: 1rem 1.25rem;
     margin: 1rem 0 1.5rem 0;
     box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
-}
-.swg-follow-banner:has(swg-popup) {
-    /* SWG 注入组件后，原占位文字隐藏 */
-    display: block;
-    padding: 0.5rem;
+    /* 默认隐藏，等 SWG 注入按钮后才显示 */
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
     border: none;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+}
+.swg-follow-banner--visible {
+    opacity: 1;
+    max-height: 120px;
+    margin: 1rem 0 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid #dadce0;
+    border-left: 4px solid #1a73e8;
+}
+.swg-follow-banner--swg-active {
+    /* SWG 注入组件后，简化样式 */
     background: transparent;
     box-shadow: none;
+    border: none;
+    border-left: none;
+    padding: 0.5rem 0;
 }
 .swg-follow-text {
     display: flex;
@@ -152,6 +182,9 @@
     gap: 0.85rem;
     flex: 1;
     min-width: 0;
+}
+.swg-follow-banner--swg-active .swg-follow-text {
+    display: none;
 }
 .swg-icon {
     font-size: 1.8rem;
@@ -170,28 +203,11 @@
     color: #5f6368;
     font-size: 0.85rem;
 }
-.swg-follow-link {
-    color: #1a73e8;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    transition: background 0.2s;
-}
-.swg-follow-link:hover {
-    background: rgba(26, 115, 232, 0.08);
-}
 @media (max-width: 600px) {
-    .swg-follow-banner {
+    .swg-follow-banner--visible {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.75rem;
-    }
-    .swg-follow-link {
-        align-self: stretch;
-        text-align: center;
     }
 }
 </style>
