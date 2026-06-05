@@ -1,0 +1,82 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #f8f9fa; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+header { background: #1a1a2e; color: white; padding: 1rem 0; }
+header .logo-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.25rem; }
+header .logo-row img { height: 48px; width: auto; }
+header h1 { font-size: 1.8rem; }
+header a { color: white; text-decoration: none; }
+nav { background: #16213e; padding: 0.5rem 0; }
+nav a { color: #e0e0e0; text-decoration: none; margin-right: 1.5rem; font-size: 0.9rem; }
+nav a:hover { color: #e94560; }
+.nav-container { display: flex; justify-content: space-between; align-items: center; }
+.nav-links { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+.nav-search-form { display: flex; gap: 4px; flex-shrink: 0; }
+.nav-search-input {
+    padding: 5px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+    font-size: 0.85rem; background: rgba(255,255,255,0.1); color: white; outline: none; width: 180px;
+    transition: border-color 0.2s, background 0.2s;
+}
+.nav-search-input::placeholder { color: #aaa; }
+.nav-search-input:focus { border-color: #e94560; background: rgba(255,255,255,0.15); }
+.nav-search-btn {
+    padding: 5px 10px; border-radius: 4px; border: none; background: #e94560;
+    color: white; cursor: pointer; font-size: 0.85rem;
+}
+.nav-search-btn:hover { background: #d63851; }
+@media (max-width: 768px) { .nav-container { flex-direction: column; gap: 8px; } .nav-search-input { width: 140px; } }
+main { padding: 2rem 0; min-height: 60vh; }
+footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 1.5rem 0; margin-top: 2rem; }
+.article-card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 1rem; align-items: flex-start; }
+.article-card-img { width: 200px; min-width: 200px; height: 130px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.article-card-body { flex: 1; min-width: 0; }
+.article-card h2, .article-card h3 { font-size: 1.1rem; margin-bottom: 0.4rem; line-height: 1.4; }
+.article-card h2 a, .article-card h3 a { color: #1a1a2e; text-decoration: none; }
+.article-card h2 a:hover, .article-card h3 a:hover { color: #e94560; }
+.article-meta { color: #666; font-size: 0.85rem; margin-bottom: 0.3rem; }
+.article-summary { color: #555; font-size: 0.9rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.article-card-side { padding: 1rem; flex-direction: column; }
+.article-card-side .article-card-img { width: 100%; min-width: 0; height: 160px; }
+.article-card-side .article-card-body { margin-top: 0.5rem; }
+.article-card-side h2, .article-card-side h3 { font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.article-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 640px) { .article-card { flex-direction: column; } .article-card-img { width: 100%; height: 180px; } }
+.hero { background: white; border-radius: 8px; overflow: hidden; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.hero img { width: 100%; height: 300px; object-fit: cover; }
+.hero-content { padding: 2rem; }
+.hero-content h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+.sidebar { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.sidebar h2, .sidebar h3 { margin-bottom: 1rem; color: #1a1a2e; }
+.grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+.pagination { display: flex; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap; overflow-x: auto; padding-bottom: 4px; }
+.pagination a, .pagination span { padding: 0.5rem 0.9rem; border-radius: 4px; text-decoration: none; white-space: nowrap; }
+.pagination a { background: #e94560; color: white; }
+.pagination span { background: #ddd; color: #666; }
+.pagination .pagi-dots { background: none; color: #999; padding: 0.5rem 0.3rem; letter-spacing: 2px; }
+.source-badge { display: inline-block; background: #e94560; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+.category-list { list-style: none; }
+.category-list li { padding: 0.3rem 0; }
+.category-list a { color: #1a1a2e; text-decoration: none; }
+.category-list a:hover { color: #e94560; }
+.text-news-list { list-style: none; }
+.text-news-list li { padding: 0.6rem 0; border-bottom: 1px solid #eee; }
+.text-news-list li:last-child { border-bottom: none; }
+.text-news-list .tn-source { font-size: 0.7rem; color: #e94560; font-weight: bold; }
+.text-news-list .tn-title { font-size: 0.85rem; line-height: 1.3; }
+.text-news-list .tn-title a { color: #1a1a2e; text-decoration: none; }
+.text-news-list .tn-title a:hover { color: #e94560; }
+.text-news-list .tn-meta { font-size: 0.75rem; color: #999; }
+.subscribe-box { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; text-align: center; }
+.subscribe-box h2, .subscribe-box h3 { color: white; margin-bottom: 0.5rem; }
+.subscribe-box p { color: #ccc; font-size: 0.9rem; margin-bottom: 1rem; }
+.subscribe-btn { display: inline-block; background: #e94560; color: white; padding: 0.7rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: bold; transition: background 0.2s; }
+.subscribe-btn:hover { background: #d63851; }
+.article-content { background: white; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+.article-content h1 { font-size: 2rem; margin-bottom: 1rem; }
+.article-content .content-body { line-height: 1.8; }
+.article-content .content-body p { margin-bottom: 1rem; }
+.breadcrumb { font-size: 0.85rem; color: #ccc; margin-bottom: 1.5rem; padding-left: 8px; }
+.breadcrumb a { color: #e0e0e0; text-decoration: none; }
+.breadcrumb a:hover { color: #e94560; }
+.breadcrumb span { margin: 0 0.3rem; }

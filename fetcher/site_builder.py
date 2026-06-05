@@ -265,6 +265,11 @@ class SiteBuilder:
             "icons": [
                 {
                     "src": "/logo.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "/logo.png",
                     "sizes": "512x512",
                     "type": "image/png"
                 }
@@ -420,50 +425,81 @@ class SiteBuilder:
         )
 
     def build_sitemap(self, sections: dict):
-        """生成 sitemap.xml — 包含首页、分类页和文章页"""
-        urlset = Element("urlset")
-        urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
-        urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
+        """生成 sitemap index + 分片 sitemap — 每个分类一个子 sitemap，避免单文件过大"""
+        MAX_URLS_PER_SITEMAP = 5000
 
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        home_el = SubElement(urlset, "url")
-        SubElement(home_el, "loc").text = f"{self._site_url}/"
-        SubElement(home_el, "lastmod").text = now_iso
-        SubElement(home_el, "changefreq").text = "hourly"
-        SubElement(home_el, "priority").text = "1.0"
-
-        # 法律页面（/terms/、/privacy/）— 重要程度仅次于首页
-        for legal_slug, priority in [("terms", "0.9"), ("privacy", "0.9")]:
-            legal_el = SubElement(urlset, "url")
-            SubElement(legal_el, "loc").text = f"{self._site_url}/{legal_slug}/"
-            SubElement(legal_el, "lastmod").text = now_iso
-            SubElement(legal_el, "changefreq").text = "monthly"
-            SubElement(legal_el, "priority").text = priority
-
-        for section_name, articles in sections.items():
-            cat_el = SubElement(urlset, "url")
-            SubElement(cat_el, "loc").text = f"{self._site_url}/{section_name}/"
-            SubElement(cat_el, "lastmod").text = articles[0]["published_iso"] if articles else now_iso
-            SubElement(cat_el, "changefreq").text = "hourly"
-            SubElement(cat_el, "priority").text = "0.8"
-
-            for article in articles:
-                url_el = SubElement(urlset, "url")
-                SubElement(url_el, "loc").text = article["permalink"]
-                SubElement(url_el, "lastmod").text = article["published_iso"]
-                SubElement(url_el, "changefreq").text = "daily"
-                SubElement(url_el, "priority").text = "0.6"
-                if article.get("image"):
-                    img_el = SubElement(url_el, "image:image")
-                    SubElement(img_el, "image:loc").text = article["image"]
-                    if article.get("title"):
-                        SubElement(img_el, "image:title").text = article["title"]
-
-        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
-            urlset, encoding="unicode"
+        # --- 首页 + 法律页面放入一个 "pages" sitemap ---
+        pages_urlset = Element("urlset")
+        pages_urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+        pages_urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
+        for loc, lastmod, changefreq, priority in [
+            (f"{self._site_url}/", now_iso, "hourly", "1.0"),
+            (f"{self._site_url}/terms/", now_iso, "monthly", "0.9"),
+            (f"{self._site_url}/privacy/", now_iso, "monthly", "0.9"),
+        ]:
+            el = SubElement(pages_urlset, "url")
+            SubElement(el, "loc").text = loc
+            SubElement(el, "lastmod").text = lastmod
+            SubElement(el, "changefreq").text = changefreq
+            SubElement(el, "priority").text = priority
+        pages_xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
+            pages_urlset, encoding="unicode"
         )
-        (self.output_dir / "sitemap.xml").write_text(xml_str, encoding="utf-8")
+        (self.output_dir / "sitemap-pages.xml").write_text(pages_xml, encoding="utf-8")
+
+        # --- 每个分类生成子 sitemap（文章过多时按 MAX_URLS_PER_SITEMAP 分片） ---
+        sitemap_files = ["sitemap-pages.xml"]
+        for section_name, articles in sections.items():
+            total = len(articles)
+            num_parts = max(1, (total + MAX_URLS_PER_SITEMAP - 1) // MAX_URLS_PER_SITEMAP)
+
+            for part_idx in range(num_parts):
+                chunk = articles[part_idx * MAX_URLS_PER_SITEMAP:(part_idx + 1) * MAX_URLS_PER_SITEMAP]
+                urlset = Element("urlset")
+                urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+                urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
+
+                # 分类首页
+                if part_idx == 0:
+                    cat_el = SubElement(urlset, "url")
+                    SubElement(cat_el, "loc").text = f"{self._site_url}/{section_name}/"
+                    SubElement(cat_el, "lastmod").text = articles[0]["published_iso"] if articles else now_iso
+                    SubElement(cat_el, "changefreq").text = "hourly"
+                    SubElement(cat_el, "priority").text = "0.8"
+
+                for article in chunk:
+                    url_el = SubElement(urlset, "url")
+                    SubElement(url_el, "loc").text = article["permalink"]
+                    SubElement(url_el, "lastmod").text = article["published_iso"]
+                    SubElement(url_el, "changefreq").text = "daily"
+                    SubElement(url_el, "priority").text = "0.6"
+                    if article.get("image"):
+                        img_el = SubElement(url_el, "image:image")
+                        SubElement(img_el, "image:loc").text = article["image"]
+                        if article.get("title"):
+                            SubElement(img_el, "image:title").text = article["title"]
+
+                suffix = f"-{part_idx + 1}" if num_parts > 1 else ""
+                filename = f"sitemap-{section_name}{suffix}.xml"
+                xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
+                    urlset, encoding="unicode"
+                )
+                (self.output_dir / filename).write_text(xml_str, encoding="utf-8")
+                sitemap_files.append(filename)
+
+        # --- 生成 sitemap index ---
+        sitemapindex = Element("sitemapindex")
+        sitemapindex.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+        for fname in sitemap_files:
+            sm_el = SubElement(sitemapindex, "sitemap")
+            SubElement(sm_el, "loc").text = f"{self._site_url}/{fname}"
+            SubElement(sm_el, "lastmod").text = now_iso
+        index_xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
+            sitemapindex, encoding="unicode"
+        )
+        (self.output_dir / "sitemap.xml").write_text(index_xml, encoding="utf-8")
 
     def build_news_sitemap(self, sections: dict):
         """生成 Google News 专用 sitemap（news-sitemap.xml）。
@@ -550,9 +586,10 @@ class SiteBuilder:
 
         rss = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
-            '<rss version="2.0">\n<channel>\n'
+            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n'
             f'  <title>{_escape_xml(self.site_title)}</title>\n'
             f'  <link>{_escape_xml(self._site_url)}/</link>\n'
+            f'  <atom:link href="{_escape_xml(self._site_url)}/index.xml" rel="self" type="application/rss+xml"/>\n'
             f'  <description>{_escape_xml(self.site_title)} - News Aggregator</description>\n'
             f'  <lastBuildDate>{now_rfc2822}</lastBuildDate>\n'
             f'  <copyright>Copyright {datetime.now(timezone.utc).year} {_escape_xml(self.site_title)}</copyright>\n'
@@ -578,9 +615,10 @@ class SiteBuilder:
             section_name_display = CATEGORY_DISPLAY_NAMES.get(section_name, section_name.capitalize())
             cat_rss = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
-                '<rss version="2.0">\n<channel>\n'
+                '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n'
                 f'  <title>{_escape_xml(self.site_title)} - {section_name_display}</title>\n'
                 f'  <link>{_escape_xml(self._site_url)}/{section_name}/</link>\n'
+                f'  <atom:link href="{_escape_xml(self._site_url)}/{section_name}/index.xml" rel="self" type="application/rss+xml"/>\n'
                 f'  <description>{_escape_xml(self.site_title)} - Latest {section_name_display} News</description>\n'
                 f'  <lastBuildDate>{now_rfc2822}</lastBuildDate>\n'
                 f'{chr(10).join(cat_items)}\n'

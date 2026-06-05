@@ -12,6 +12,8 @@
 <meta property="og:image:alt" content="{{ hero_article.title }}">
 <meta name="twitter:card" content="summary_large_image">
 {% else %}
+<meta property="og:image" content="{{ site_url }}/logo.png">
+<meta property="og:image:alt" content="{{ site_title }}">
 <meta name="twitter:card" content="summary">
 {% endif %}
 <meta name="twitter:title" content="{{ site_title }}">
@@ -66,7 +68,7 @@
             {% endif %}
             <div class="hero-content">
                 <span class="source-badge">{{ hero_article.source }}</span>
-                <h2><a href="{{ hero_article.permalink }}">{{ hero_article.title }}</a></h2>
+                <h3><a href="{{ hero_article.permalink }}">{{ hero_article.title }}</a></h3>
                 <div class="article-meta">
                     <time datetime="{{ hero_article.published_iso }}">{{ hero_article.published_display }}</time> &middot; {{ hero_article.author }}
                 </div>
@@ -82,7 +84,7 @@
                 <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
                 <div class="article-card-body">
                     <span class="source-badge">{{ article.source }}</span>
-                    <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                    <h3><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
                     <div class="article-meta">{{ article.published_display }}</div>
                 </div>
             </div>
@@ -90,7 +92,7 @@
         </div>
         {% endif %}
 
-        <h3 style="margin-bottom: 1rem;">Latest News</h3>
+        <h2 style="margin-bottom: 1rem;">Latest News</h2>
         {% for article in latest_articles %}
         <div class="article-card">
             {% if article.image %}
@@ -98,7 +100,7 @@
             {% endif %}
             <div class="article-card-body">
                 <span class="source-badge">{{ article.source }}</span>
-                <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
+                <h3><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
                 <div class="article-meta">
                     <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.category }} &middot; {{ article.author }}
                 </div>
@@ -130,7 +132,7 @@
             {% endif %}
         </div>
 
-        <h3>Latest Headlines</h3>
+        <h2>Latest Headlines</h2>
         <ul class="text-news-list">
             {% for article in no_image_articles %}
             <li>
