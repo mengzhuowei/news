@@ -167,7 +167,7 @@ async def subscribe_page():
 """
 
     if bot_username:
-        html += f'            <a href="https://t.me/{bot_username}" class="btn" target="_blank">Open Telegram Bot</a>\n'
+        html += f'            <a href="https://t.me/{bot_username}" class="btn" target="_blank" data-ga-event="newsletter_signup_click" data-ga-source="subscribe_page_telegram">Open Telegram Bot</a>\n'
     else:
         html += '            <p style="color: #999;">Telegram bot not configured yet.</p>\n'
 
@@ -177,6 +177,12 @@ async def subscribe_page():
             </footer>
         </div>
     </div>
+    <script>
+    (function(){
+      if (typeof gtag !== 'function') return;
+      gtag('event', 'page_view', { page_type: 'subscribe' });
+    })();
+    </script>
 </body>
 </html>"""
     return HTMLResponse(content=html)

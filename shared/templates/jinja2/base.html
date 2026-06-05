@@ -125,6 +125,7 @@
         gtag('js', new Date());
         gtag('config', '{{ ga_id }}');
     </script>
+    <script src="/js/analytics.js" defer></script>
     {% if twitter_site %}<meta name="twitter:site" content="{{ twitter_site }}">{% endif %}
     {% if twitter_creator %}<meta name="twitter:creator" content="{{ twitter_creator }}">{% endif %}
     {% block head %}{% endblock %}
@@ -132,7 +133,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_client_id }}" crossorigin="anonymous"></script>
     {% endif %}
 </head>
-<body>
+<body{% if page_type %} data-page-type="{{ page_type }}"{% if section_name %} data-section="{{ section_name }}"{% endif %}{% if article_id %} data-article-id="{{ article_id }}" data-article-title="{{ article_title | default('') }}" data-article-source="{{ article_source | default('') }}" data-article-category="{{ article_category | default('') }}"{% endif %}{% endif %}>
     <header>
         <div class="container">
             <div class="logo-row">

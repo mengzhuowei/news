@@ -113,11 +113,20 @@
             <h3>📬 Subscribe</h3>
             <p>Get daily news digests via Telegram</p>
             {% if telegram_bot_username %}
-            <a href="https://t.me/{{ telegram_bot_username }}" class="subscribe-btn" target="_blank" rel="noopener">
+            <a href="https://t.me/{{ telegram_bot_username }}"
+               class="subscribe-btn"
+               target="_blank" rel="noopener"
+               data-ga-event="newsletter_signup_click"
+               data-ga-source="homepage_sidebar_telegram">
                 Open Telegram Bot
             </a>
             {% else %}
-            <a href="/subscribe" class="subscribe-btn">Subscribe Now</a>
+            <a href="/subscribe"
+               class="subscribe-btn"
+               data-ga-event="newsletter_signup_click"
+               data-ga-source="homepage_sidebar_fallback">
+                Subscribe Now
+            </a>
             {% endif %}
         </div>
 

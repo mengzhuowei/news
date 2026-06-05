@@ -188,9 +188,7 @@ class SiteBuilder:
         try:
             self._refresh_config()
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            static_logo = Path(__file__).parent.parent / "shared" / "static" / "logo.png"
-            if static_logo.exists():
-                shutil.copy2(static_logo, self.output_dir / "logo.png")
+            self._copy_static_assets()
             self._build_manifest_json()
             sections = self._load_from_db()
 
@@ -228,6 +226,7 @@ class SiteBuilder:
 
             self.build_homepage(sections)
             self.build_sitemap(sections)
+            self.build_news_sitemap(sections)
             self.build_rss(sections)
             self.build_robots_txt()
 
@@ -261,6 +260,23 @@ class SiteBuilder:
             json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
         )
         logger.info("manifest.json generated")
+
+    def _copy_static_assets(self):
+        """Copy shared/static/* into the dist root (logo.png, js/, css/, etc.)."""
+        static_root = Path(__file__).parent.parent / "shared" / "static"
+        if not static_root.exists():
+            return
+        copied = 0
+        for src in static_root.rglob("*"):
+            if not src.is_file():
+                continue
+            rel = src.relative_to(static_root)
+            dest = self.output_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            copied += 1
+        if copied:
+            logger.info(f"Copied {copied} static asset(s) → {self.output_dir}")
 
     def _mark_articles_as_built(self, sections: dict[str, list[dict]]):
         """标记所有文章为已构建 — 使用 ID 而非 slug 防止碰撞误更新"""
@@ -305,6 +321,12 @@ class SiteBuilder:
             permalink=article["permalink"],
             canonical_url=article["permalink"],
             page_lang=article.get("language", "en"),
+            page_type="article",
+            article_id=article.get("id", ""),
+            article_title=article.get("title", ""),
+            article_source=article.get("source", ""),
+            article_category=article.get("category", ""),
+            section_name=section_name,
             related_articles=related_articles,
             sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
@@ -343,6 +365,8 @@ class SiteBuilder:
         ctx = self._base_ctx(
             section_name=section_name,
             section_name_display=section_name_display,
+            page_type="list",
+            section_name_ctx=section_name,
             articles=page_articles,
             page=page_num,
             total_pages=total_pages,
@@ -368,6 +392,7 @@ class SiteBuilder:
 
         template = self.env.get_template("index.html")
         ctx = self._base_ctx(
+            page_type="home",
             hero_article=has_image[0] if has_image else None,
             hero_side_articles=has_image[1:4] if len(has_image) > 1 else [],
             latest_articles=has_image[4:10] if len(has_image) > 4 else (has_image[1:] if len(has_image) > 1 else []),
@@ -417,6 +442,63 @@ class SiteBuilder:
             urlset, encoding="unicode"
         )
         (self.output_dir / "sitemap.xml").write_text(xml_str, encoding="utf-8")
+
+    def build_news_sitemap(self, sections: dict):
+        """生成 Google News 专用 sitemap（news-sitemap.xml）。
+        仅收录 48 小时内的文章，避免被 Google News 拒收。
+        参考：https://developers.google.com/search/docs/specialty/news
+        """
+        from datetime import timedelta
+
+        urlset = Element("urlset")
+        urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
+        urlset.set("xmlns:news", "https://www.google.com/schemas/sitemap-news/0.9")
+        urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+        total = 0
+        for articles in sections.values():
+            for article in articles:
+                if article["date"] < cutoff:
+                    continue
+                url_el = SubElement(urlset, "url")
+                # Google News 要求 loc 是文章页 URL，且与 sitemap.xml 一致
+                SubElement(url_el, "loc").text = article["permalink"]
+
+                news_el = SubElement(url_el, "news:news")
+                pub_el = SubElement(news_el, "news:publication")
+                # Google News 要求 publication name 固定且非空
+                SubElement(pub_el, "news:name").text = self.site_title
+                SubElement(pub_el, "news:language").text = (
+                    article.get("language") or "en"
+                )
+
+                SubElement(news_el, "news:publication_date").text = article["published_iso"]
+                SubElement(news_el, "news:title").text = article["title"]
+                SubElement(news_el, "news:keywords").text = (
+                    f"{article['category']}, {article['source']}"
+                )
+                if article.get("source_url"):
+                    # 原来源（非必填，但有助于 Google 信任）
+                    SubElement(news_el, "news:original_source").text = article["source"]
+
+                if article.get("image"):
+                    img_el = SubElement(url_el, "image:image")
+                    SubElement(img_el, "image:loc").text = article["image"]
+                    SubElement(img_el, "image:title").text = article["title"]
+
+                total += 1
+                # Google News sitemap 单文件上限 1000 条
+                if total >= 1000:
+                    break
+            if total >= 1000:
+                break
+
+        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
+            urlset, encoding="unicode"
+        )
+        (self.output_dir / "news-sitemap.xml").write_text(xml_str, encoding="utf-8")
+        logger.info(f"news-sitemap.xml generated ({total} articles)")
 
     def build_rss(self, sections: dict):
         """生成 RSS feed（全局 + 按分类）"""
@@ -482,21 +564,89 @@ class SiteBuilder:
             (cat_dir / "index.xml").write_text(cat_rss, encoding="utf-8")
 
     def build_robots_txt(self):
-        """生成 robots.txt"""
+        """生成 robots.txt：常规爬虫放行，AI 训练爬虫与明显扫描器拒绝。
+        注意：robots.txt 是"君子协定"，严格拦截请配合 Nginx/Caddy/WAF。
+        """
         sitemap_url = f"{self._site_url}/sitemap.xml"
-        content = (
-            "User-agent: *\n"
-            "Allow: /\n"
-            "Disallow: /page/\n"
-            "Disallow: /admin/\n"
-            "Disallow: /subscribe\n"
-            "Disallow: /subscription/\n"
-            "Disallow: /*?q=\n"
-            "Disallow: /*?page=\n"
-            "Crawl-Delay: 10\n"
-            f"Sitemap: {sitemap_url}\n"
-        )
-        (self.output_dir / "robots.txt").write_text(content, encoding="utf-8")
+        news_sitemap_url = f"{self._site_url}/news-sitemap.xml"
+
+        # AI 训练爬虫与已知骚扰 UA 名单
+        # 涵盖主流 LLM/AI Search/SEO 爬虫与无脑扫描器
+        ai_bots = [
+            "GPTBot",              # OpenAI 训练
+            "ChatGPT-User",        # OpenAI Browse
+            "OAI-SearchBot",       # OpenAI Search
+            "ClaudeBot",           # Anthropic 训练
+            "Claude-SearchBot",    # Anthropic Search
+            "Claude-User",         # Anthropic Browse
+            "Claude-Web",          # Anthropic Web
+            "PerplexityBot",       # Perplexity 训练
+            "Perplexity-User",     # Perplexity Browse
+            "Google-Extended",     # Google Gemini 训练（不影响 Googlebot 索引）
+            "Applebot-Extended",   # Apple Intelligence 训练
+            "Bytespider",          # 字节跳动
+            "CCBot",               # Common Crawl → 多家 LLM
+            "Meta-ExternalAgent",  # Meta AI
+            "Meta-ExternalFetcher",
+            "Amazonbot",           # Amazon AI
+            "cohere-ai",           # Cohere
+            "cohere-training-data-crawler",
+            "DuckAssistBot",       # DuckDuckGo AI
+            "FacebookBot",         # Meta（旧）
+            "Gemini-Deep-Research",
+            "Kangaroo Bot",        # 一些 AI 聚合
+            "MistralAI-User",
+            "anthropic-ai",
+            "img2dataset",         # LAION 等数据集
+            "LAION-AI",
+            "Omgilibot",
+            "Omgili",
+            "TimpiBot",
+            "YouBot",              # You.com
+        ]
+
+        # 已知的 SEO 爬虫/恶意扫描器（与 GA 流量无价值）
+        seo_bots = [
+            "AhrefsBot",
+            "SemrushBot",
+            "DotBot",
+            "MJ12bot",
+            "BLEXBot",
+            "SeekportBot",
+            "YandexBot",
+            "YandexImages",
+            "Mail.Ru_Bot",
+        ]
+
+        lines = []
+        # 1) 通用规则（仅对未被下方显式列出的 UA 生效）
+        lines += [
+            "User-agent: *",
+            "Allow: /",
+            "Disallow: /page/",
+            "Disallow: /admin/",
+            "Disallow: /subscribe",
+            "Disallow: /subscription/",
+            "Disallow: /api/",
+            "Disallow: /search/?",
+            "Disallow: /*?q=",
+            "Disallow: /*?page=",
+            "Crawl-Delay: 10",
+            "",
+        ]
+        # 2) AI 训练爬虫：整站拒绝
+        for bot in ai_bots:
+            lines += [f"User-agent: {bot}", "Disallow: /", ""]
+        # 3) 主动 SEO 爬虫：拒绝（聚合站不需要被这些工具深度爬取）
+        for bot in seo_bots:
+            lines += [f"User-agent: {bot}", "Disallow: /", ""]
+        # 4) Sitemap 引用
+        lines += [
+            f"Sitemap: {sitemap_url}",
+            f"Sitemap: {news_sitemap_url}",
+            "",
+        ]
+        (self.output_dir / "robots.txt").write_text("\n".join(lines), encoding="utf-8")
 
 
 def _escape_xml(text: str) -> str:

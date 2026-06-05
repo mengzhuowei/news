@@ -1,3 +1,48 @@
+# --- 反爬 / 限流 / 真实 IP ---
+# 若使用 Cloudflare，请把下方 set_real_ip_from 替换为 Cloudflare 公布的 IP 段
+# https://www.cloudflare.com/ips-v4 + ips-v6
+map $http_user_agent $is_bot_ua {
+    default 0;
+    # 无脑扫描器 / 渗透工具
+    ~*(?:nikto|sqlmap|nmap|masscan|zgrab|nuclei|nessus|wpscan|acunetix|qualys|dirbuster|gobuster|ffuf) 1;
+    # Python/Go/Node 默认 UA（爬虫常用）
+    ~*(?:^python-requests|^python-urllib|^go-http-client|^Java/|^okhttp|^curl/|^wget/|^libwww-perl|^scrapy|^httpx|^axios/|^node-fetch|^HeadlessChrome|^phantomjs|^selenium) 1;
+    # 无 UA
+    "" 1;
+}
+
+# 单 IP 请求速率：每秒 10 个请求（突发 20）
+limit_req_zone $binary_remote_addr zone=req_per_ip:10m rate=10r/s;
+# 单 IP 并发连接数
+limit_conn_zone $binary_remote_addr zone=conn_per_ip:10m;
+# 静态资源不限流
+limit_req_zone $binary_remote_addr zone=req_static:10m rate=100r/s;
+
+# 真实 IP（如果前面有 Cloudflare/CDN，取消下行注释并填入 IP 段）
+# set_real_ip_from 103.21.244.0/22;
+# set_real_ip_from 103.22.200.0/22;
+# set_real_ip_from 103.31.4.0/22;
+# set_real_ip_from 104.16.0.0/13;
+# set_real_ip_from 104.24.0.0/14;
+# set_real_ip_from 108.162.192.0/18;
+# set_real_ip_from 131.0.72.0/22;
+# set_real_ip_from 141.101.64.0/18;
+# set_real_ip_from 162.158.0.0/15;
+# set_real_ip_from 172.64.0.0/13;
+# set_real_ip_from 173.245.48.0/20;
+# set_real_ip_from 188.114.96.0/20;
+# set_real_ip_from 190.93.240.0/20;
+# set_real_ip_from 197.234.240.0/22;
+# set_real_ip_from 198.41.128.0/17;
+# set_real_ip_from 2400:cb00::/32;
+# set_real_ip_from 2606:4700::/32;
+# set_real_ip_from 2803:f800::/32;
+# set_real_ip_from 2405:b500::/32;
+# set_real_ip_from 2405:8100::/32;
+# set_real_ip_from 2c0f:f248::/32;
+# set_real_ip_from 2a06:98c0::/29;
+# real_ip_header CF-Connecting-IP;
+
 server {
     listen 80;
     listen [::]:80;
@@ -5,6 +50,11 @@ server {
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
+    }
+
+    # 屏蔽明显的恶意扫描器（直接 444 关连接，不返回响应）
+    if ($is_bot_ua) {
+        return 444;
     }
 
     location / {
@@ -50,6 +100,9 @@ server {
     ssl_prefer_server_ciphers off;
 
     add_header Strict-Transport-Security "max-age=63072000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
@@ -58,7 +111,18 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # 屏蔽恶意 UA
+    if ($is_bot_ua) {
+        return 444;
+    }
+
+    # 全局限流兜底
+    limit_req zone=req_per_ip burst=20 nodelay;
+    limit_conn conn_per_ip 30;
+
     location /api/ {
+        # API 更严格的限流
+        limit_req zone=req_per_ip burst=10 nodelay;
         proxy_pass http://web:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -88,6 +152,14 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 静态资源：缓存 + 放宽限流
+    location ~* \.(css|js|jpg|jpeg|png|gif|webp|svg|ico|woff2?)$ {
+        limit_req zone=req_static burst=200 nodelay;
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
     }
 
     location / {

@@ -43,6 +43,8 @@
     "dateModified": {{ page.published_iso | tojson }},
     "author": {"@type": "Person", "name": {{ page.author | tojson }}},
     "articleSection": {{ page.category | tojson }},
+    "wordCount": {{ (page.content or '')|length }},
+    "articleBody": {{ (page.content or '')[:3000] | tojson }},
     "publisher": {
         "@type": "Organization",
         "name": {{ site_title | tojson }},
@@ -50,8 +52,7 @@
             "@type": "ImageObject",
             "url": "{{ site_url }}/logo.png"
         }
-    }
-    {% if page.image %},"image": {{ page.image | tojson }}{% endif %}
+    }{% if page.image %},"image": {{ page.image | tojson }}{% endif %},"isAccessibleForFree": true
 }
 </script>
 <script type="application/ld+json">
