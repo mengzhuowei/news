@@ -446,58 +446,61 @@ class SiteBuilder:
     def build_news_sitemap(self, sections: dict):
         """生成 Google News 专用 sitemap（news-sitemap.xml）。
         仅收录 48 小时内的文章，避免被 Google News 拒收。
-        参考：https://developers.google.com/search/docs/specialty/news
+        使用字符串拼接而不是 ElementTree，避免 ET 在带前缀命名空间
+        （如 news:news / image:image）上的序列化 bug。
+        参考：https://developers.google.com/search/docs/specialty/news/sitemap-news
         """
         from datetime import timedelta
 
-        urlset = Element("urlset")
-        urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
-        urlset.set("xmlns:news", "https://www.google.com/schemas/sitemap-news/0.9")
-        urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
-
         cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
         total = 0
+        items: list[str] = []
+
         for articles in sections.values():
             for article in articles:
                 if article["date"] < cutoff:
                     continue
-                url_el = SubElement(urlset, "url")
-                # Google News 要求 loc 是文章页 URL，且与 sitemap.xml 一致
-                SubElement(url_el, "loc").text = article["permalink"]
 
-                news_el = SubElement(url_el, "news:news")
-                pub_el = SubElement(news_el, "news:publication")
-                # Google News 要求 publication name 固定且非空
-                SubElement(pub_el, "news:name").text = self.site_title
-                SubElement(pub_el, "news:language").text = (
-                    article.get("language") or "en"
-                )
-
-                SubElement(news_el, "news:publication_date").text = article["published_iso"]
-                SubElement(news_el, "news:title").text = article["title"]
-                SubElement(news_el, "news:keywords").text = (
-                    f"{article['category']}, {article['source']}"
-                )
-                if article.get("source_url"):
-                    # 原来源（非必填，但有助于 Google 信任）
-                    SubElement(news_el, "news:original_source").text = article["source"]
-
+                parts = [
+                    "  <url>",
+                    f"    <loc>{_escape_xml(article['permalink'])}</loc>",
+                    "    <news:news>",
+                    "      <news:publication>",
+                    f"        <news:name>{_escape_xml(self.site_title)}</news:name>",
+                    f"        <news:language>{_escape_xml(article.get('language') or 'en')}</news:language>",
+                    "      </news:publication>",
+                    f"      <news:publication_date>{_escape_xml(article['published_iso'])}</news:publication_date>",
+                    f"      <news:title>{_escape_xml(article['title'])}</news:title>",
+                    f"      <news:keywords>{_escape_xml(article['category'] + ', ' + article['source'])}</news:keywords>",
+                    "    </news:news>",
+                ]
                 if article.get("image"):
-                    img_el = SubElement(url_el, "image:image")
-                    SubElement(img_el, "image:loc").text = article["image"]
-                    SubElement(img_el, "image:title").text = article["title"]
+                    parts += [
+                        "    <image:image>",
+                        f"      <image:loc>{_escape_xml(article['image'])}</image:loc>",
+                        f"      <image:title>{_escape_xml(article['title'])}</image:title>",
+                        "    </image:image>",
+                    ]
+                parts.append("  </url>")
+                items.append("\n".join(parts))
 
                 total += 1
-                # Google News sitemap 单文件上限 1000 条
-                if total >= 1000:
+                if total >= 1000:  # Google News sitemap 单文件上限
                     break
             if total >= 1000:
                 break
 
-        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
-            urlset, encoding="unicode"
+        # 注意：xmlns 必须全部在根标签里、xmlns:news 单独成对，
+        # 顺序也按 Google 习惯（default namespace 在前）
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+            '        xmlns:news="https://www.google.com/schemas/sitemap-news/0.9"\n'
+            '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
+            + "\n".join(items) + (items and "\n" or "")
+            + "</urlset>\n"
         )
-        (self.output_dir / "news-sitemap.xml").write_text(xml_str, encoding="utf-8")
+        (self.output_dir / "news-sitemap.xml").write_text(body, encoding="utf-8")
         logger.info(f"news-sitemap.xml generated ({total} articles)")
 
     def build_rss(self, sections: dict):
