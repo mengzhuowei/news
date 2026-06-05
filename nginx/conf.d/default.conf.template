@@ -16,7 +16,7 @@ map $http_user_agent $is_bot_ua {
     ~*(?:cohere-ai|cohere-training-data-crawler) 1;
     ~*(?:DuckAssistBot|duckassistbot) 1;
     ~*(?:Gemini-Deep-Research|gemini-deep-research) 1;
-    ~*(?:Kangaroo ?Bot|MistralAI-User|mistralai-user) 1;
+    ~*(?:Kangaroo\ Bot|KangarooBot|MistralAI-User|mistralai-user) 1;
     ~*(?:img2dataset|LAION-AI|Omgilibot|Omgili|TimpiBot|timpibot) 1;
     ~*(?:YouBot|youbot) 1;
 
