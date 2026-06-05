@@ -229,7 +229,7 @@ class SiteBuilder:
             self.build_news_sitemap(sections)
             self.build_rss(sections)
             self.build_robots_txt()
-            self.build_legal_pages()
+            self.build_legal_pages(sections)
 
             self._mark_articles_as_built(sections)
 
@@ -660,24 +660,22 @@ class SiteBuilder:
         ]
         (self.output_dir / "robots.txt").write_text("\n".join(lines), encoding="utf-8")
 
-    def build_legal_pages(self):
+    def build_legal_pages(self, sections: dict):
         """生成静态法律页面：/terms/ 和 /privacy/
         改写为静态文件（不再走 FastAPI），原因：
         1. 与"纯静态站点"架构一致
         2. 可被 Nginx / Cloudflare 缓存
         3. 减少对 web 容器的依赖
+
+        接收 sections 字典是为了 base.html 的分类导航显示真实文章数
         """
         # 实际构建日期注入模板，用于"Last updated"显示
         build_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
-        # 法律页面不需要展示分类导航，但 base.html 强制要求 sections
-        empty_sections = {
-            k: {"count": 0, "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())}
-            for k in CATEGORY_DISPLAY_NAMES
-        }
+        # 复用真实 sections（让 base.html 的分类导航显示正确数字）
         ctx = self._base_ctx(
             page_type="legal",
             build_date=build_date,
-            sections=empty_sections,
+            sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         for slug, tpl_name in [("terms", "terms.html"), ("privacy", "privacy.html")]:
             template = self.env.get_template(tpl_name)
