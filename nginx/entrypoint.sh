@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# Install curl for healthcheck
+if ! command -v curl >/dev/null 2>&1; then
+    apt-get update -qq && apt-get install -y -qq curl && rm -rf /var/lib/apt/lists/*
+fi
+
 RAW_DOMAIN=$(echo "$SITE_BASEURL" | sed -e 's|^https\?://||' -e 's|/.*$||')
 
 if [ -z "$RAW_DOMAIN" ]; then
