@@ -3,11 +3,32 @@
 # https://www.cloudflare.com/ips-v4 + ips-v6
 map $http_user_agent $is_bot_ua {
     default 0;
-    # 无脑扫描器 / 渗透工具
+    # --- AI 训练 / 搜索爬虫（与 robots.txt 同步）---
+    ~*(?:GPTBot|ChatGPT-User|OAI-SearchBot|oai-searchbot) 1;
+    ~*(?:ClaudeBot|Claude-SearchBot|Claude-User|Claude-Web|claude-web|anthropic-ai) 1;
+    ~*(?:PerplexityBot|Perplexity-User|perplexity-user) 1;
+    ~*(?:Google-Extended|GoogleOther|google-extended) 1;
+    ~*(?:Applebot-Extended|applebot-extended) 1;
+    ~*(?:Bytespider|bytespider) 1;
+    ~*(?:CCBot|ccbot) 1;
+    ~*(?:Meta-ExternalAgent|Meta-ExternalFetcher|meta-externalagent|meta-externalfetcher|FacebookBot) 1;
+    ~*(?:Amazonbot|amazonbot) 1;
+    ~*(?:cohere-ai|cohere-training-data-crawler) 1;
+    ~*(?:DuckAssistBot|duckassistbot) 1;
+    ~*(?:Gemini-Deep-Research|gemini-deep-research) 1;
+    ~*(?:Kangaroo ?Bot|MistralAI-User|mistralai-user) 1;
+    ~*(?:img2dataset|LAION-AI|Omgilibot|Omgili|TimpiBot|timpibot) 1;
+    ~*(?:YouBot|youbot) 1;
+
+    # --- 主动 SEO / 监控爬虫（与 robots.txt 同步）---
+    ~*(?:AhrefsBot|ahrefsbot|SemrushBot|semrushbot|DotBot|MJ12bot|BLEXBot|SeekportBot) 1;
+    ~*(?:YandexBot|YandexImages|Mail\.Ru_Bot) 1;
+
+    # --- 无脑扫描器 / 渗透工具 ---
     ~*(?:nikto|sqlmap|nmap|masscan|zgrab|nuclei|nessus|wpscan|acunetix|qualys|dirbuster|gobuster|ffuf) 1;
-    # Python/Go/Node 默认 UA（爬虫常用）
+    # --- Python/Go/Node 默认 UA（爬虫常用）---
     ~*(?:^python-requests|^python-urllib|^go-http-client|^Java/|^okhttp|^curl/|^wget/|^libwww-perl|^scrapy|^httpx|^axios/|^node-fetch|^HeadlessChrome|^phantomjs|^selenium) 1;
-    # 无 UA
+    # --- 无 UA ---
     "" 1;
 }
 
