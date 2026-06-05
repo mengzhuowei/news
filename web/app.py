@@ -173,7 +173,7 @@ async def subscribe_page():
 
     html += """
             <footer>
-                <p><a href="/">← Back to homepage</a></p>
+                <p><a href="/">← Back to homepage</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
             </footer>
         </div>
     </div>
@@ -186,7 +186,6 @@ async def subscribe_page():
 </body>
 </html>"""
     return HTMLResponse(content=html)
-
 
 if DIST_DIR.exists():
     app.mount("/dist", StaticFiles(directory=str(DIST_DIR), html=True), name="dist")

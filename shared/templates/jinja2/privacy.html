@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy - {{ site_title }}{% endblock %}
+{% block description %}Privacy Policy for our news aggregation website.{% endblock %}
+{% block canonical_url %}{{ site_url }}/privacy/{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span>›</span>
+    <span>Privacy Policy</span>
+</nav>
+
+<article class="legal-page" style="max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 2.5rem 3rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); line-height: 1.7;">
+    <h1 style="font-size: 1.8rem; color: #1a1a2e; margin-bottom: 0.5rem;">Privacy Policy</h1>
+    <p style="color: #888; font-size: 0.85rem; margin-bottom: 2rem;">Last updated: {{ build_date | default('June 5, 2026') }}</p>
+
+    <p>This Privacy Policy describes how <strong>{{ site_title }}</strong>
+    (the "Service") collects, uses, and protects information when you
+    visit {{ site_url }}/.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">1. Information We Collect</h2>
+    <p>We collect a minimal amount of information necessary to operate
+    the Service and improve user experience:</p>
+    <ul>
+        <li><strong>Usage data</strong>: pages viewed, time spent,
+            referring source, device type, and country (via Google
+            Analytics 4 — anonymized IP addresses).</li>
+        <li><strong>Voluntary submissions</strong>: if you subscribe
+            to our Telegram bot, we store the chat ID and your
+            category/time preferences solely to deliver digests.</li>
+        <li><strong>Cookies</strong>: essential cookies for site
+            functionality; analytics cookies via Google Analytics 4
+            (you may opt out via your browser settings or the
+            <a href="https://tools.google.com/dlpage/gaoptout"
+            target="_blank" rel="noopener">Google Analytics Opt-out
+            Add-on</a>).</li>
+    </ul>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">2. How We Use Information</h2>
+    <ul>
+        <li>To operate, maintain, and improve the Service.</li>
+        <li>To analyze aggregate usage trends (no individual
+            identification).</li>
+        <li>To deliver subscribed news digests via Telegram.</li>
+        <li>To respond to inquiries or support requests.</li>
+    </ul>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">3. Third-Party Services</h2>
+    <p>We use the following third-party services that may collect
+    information as governed by their own privacy policies:</p>
+    <ul>
+        <li><strong>Google Analytics 4</strong> — web analytics
+            (<a href="https://policies.google.com/privacy"
+            target="_blank" rel="noopener">Google Privacy Policy</a>)</li>
+        <li><strong>Google AdSense</strong> — advertising (if
+            enabled on this site; uses cookies for ad personalization
+            — you can opt out via
+            <a href="https://www.google.com/settings/ads"
+            target="_blank" rel="noopener">Google Ads Settings</a>)</li>
+        <li><strong>Telegram Bot API</strong> — for subscription
+            delivery (<a href="https://telegram.org/privacy"
+            target="_blank" rel="noopener">Telegram Privacy Policy</a>)</li>
+    </ul>
+    <p>Articles on this site contain links to external news sources.
+    Clicking those links will take you to a third-party website whose
+    privacy practices we do not control.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">4. Data Sharing</h2>
+    <p>We <strong>do not sell</strong>, trade, or rent your personal
+    information to third parties for marketing purposes. We may share
+    anonymized, aggregate statistics (e.g., "X users from Y country
+    visited this article") with our news source partners and the
+    public.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">5. AI Training</h2>
+    <p>Our site is configured to <strong>opt out of AI training
+    crawlers</strong> via the robots.txt file. The following crawlers
+    are explicitly disallowed:
+    GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot, Bytespider, CCBot,
+    Google-Extended, Applebot-Extended, and others listed in our
+    <a href="/robots.txt">robots.txt</a>.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">6. Data Retention</h2>
+    <ul>
+        <li><strong>Google Analytics</strong>: data is retained for
+            14 months (Google's default), then automatically deleted.</li>
+        <li><strong>Telegram subscriptions</strong>: retained until
+            you unsubscribe via the bot's /stop command.</li>
+        <li><strong>Server logs</strong>: retained for 30 days for
+            security and debugging, then deleted.</li>
+    </ul>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">7. Your Rights</h2>
+    <p>Depending on your jurisdiction (e.g., GDPR, CCPA), you may have
+    the right to access, correct, or delete personal information we
+    hold. To exercise these rights, contact us through the channels
+    listed on our homepage. We will respond within 30 days.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">8. Children's Privacy</h2>
+    <p>The Service is not directed to children under 13. We do not
+    knowingly collect personal information from children.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">9. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. The
+    "Last updated" date at the top will reflect any changes.
+    Continued use of the Service after changes constitutes acceptance.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">10. Contact</h2>
+    <p>For privacy-related inquiries, please contact us at the
+    contact information provided on our homepage.</p>
+</article>
+
+<p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+    <a href="/">← Back to homepage</a> ·
+    <a href="/terms">Terms of Service</a>
+</p>
+{% endblock %}

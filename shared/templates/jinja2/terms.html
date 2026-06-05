@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service - {{ site_title }}{% endblock %}
+{% block description %}Terms of Service for our news aggregation website.{% endblock %}
+{% block canonical_url %}{{ site_url }}/terms/{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span>›</span>
+    <span>Terms of Service</span>
+</nav>
+
+<article class="legal-page" style="max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 2.5rem 3rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); line-height: 1.7;">
+    <h1 style="font-size: 1.8rem; color: #1a1a2e; margin-bottom: 0.5rem;">Terms of Service</h1>
+    <p style="color: #888; font-size: 0.85rem; margin-bottom: 2rem;">Last updated: {{ build_date | default('June 5, 2026') }}</p>
+
+    <p>Welcome to <strong>{{ site_title }}</strong> (the "Service").
+    By accessing or using our website at {{ site_url }}/ you agree
+    to be bound by these Terms of Service ("Terms"). If you disagree with
+    any part, please do not use the Service.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">1. Service Description</h2>
+    <p>The Service is a <strong>news aggregation platform</strong> that
+    automatically collects, summarizes, and republishes headlines and
+    excerpts from third-party news sources including (but not limited to)
+    BBC News, Reuters, Bloomberg, Financial Times, TechCrunch, Yahoo News,
+    and The New York Times. All original articles remain the property of
+    their respective publishers.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">2. Content Ownership &amp; Attribution</h2>
+    <ul>
+        <li>All article headlines, summaries, and curated selections
+            displayed on this site are the work of our editorial team
+            and/or AI systems under fair use for news reporting.</li>
+        <li>The original source of every article is clearly attributed
+            with a direct link to the publisher's original page.</li>
+        <li>Trademarks, logos, and brand names of third-party publishers
+            remain the property of their respective owners.</li>
+        <li>If you are a copyright holder and believe content has been
+            used in a manner that violates your rights, please contact
+            us for prompt removal.</li>
+    </ul>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">3. Acceptable Use</h2>
+    <p>You agree NOT to:</p>
+    <ul>
+        <li>Scrape, crawl, or systematically collect content from this
+            site for commercial purposes without prior written consent.</li>
+        <li>Use the Service for any unlawful purpose or to violate any
+            applicable local, state, national, or international law.</li>
+        <li>Attempt to interfere with the Service's security or
+            functionality, including by introducing viruses or malware.</li>
+        <li>Use automated systems (bots, scrapers) to access the Service
+            except for legitimate search engine indexing.</li>
+    </ul>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">4. Third-Party Links &amp; Services</h2>
+    <p>Articles link to original sources on third-party websites. We are
+    <strong>not responsible</strong> for the content, accuracy, or
+    practices of any third-party site. Reading those sites is at your
+    own risk and subject to their own terms and privacy policies.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">5. Disclaimer of Warranties</h2>
+    <p>The Service is provided on an "AS IS" and "AS AVAILABLE" basis
+    without warranties of any kind. We do not guarantee the accuracy,
+    completeness, or timeliness of any news content. News is inherently
+    time-sensitive and may become outdated.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">6. Limitation of Liability</h2>
+    <p>To the maximum extent permitted by law, we shall not be liable for
+    any indirect, incidental, special, consequential, or punitive damages
+    resulting from your use of (or inability to use) the Service.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">7. Modifications</h2>
+    <p>We reserve the right to modify these Terms at any time. Continued
+    use of the Service after changes constitutes acceptance of the new
+    Terms. The "Last updated" date above will reflect any changes.</p>
+
+    <h2 style="font-size: 1.15rem; color: #1a1a2e; margin: 1.8rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">8. Contact</h2>
+    <p>For questions regarding these Terms, please contact us at the
+    contact information provided on our homepage.</p>
+</article>
+
+<p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+    <a href="/">← Back to homepage</a> ·
+    <a href="/privacy">Privacy Policy</a>
+</p>
+{% endblock %}

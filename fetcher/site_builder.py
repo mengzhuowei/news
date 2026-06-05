@@ -229,6 +229,7 @@ class SiteBuilder:
             self.build_news_sitemap(sections)
             self.build_rss(sections)
             self.build_robots_txt()
+            self.build_legal_pages()
 
             self._mark_articles_as_built(sections)
 
@@ -418,6 +419,14 @@ class SiteBuilder:
         SubElement(home_el, "lastmod").text = now_iso
         SubElement(home_el, "changefreq").text = "hourly"
         SubElement(home_el, "priority").text = "1.0"
+
+        # 法律页面（/terms/、/privacy/）— 重要程度仅次于首页
+        for legal_slug, priority in [("terms", "0.9"), ("privacy", "0.9")]:
+            legal_el = SubElement(urlset, "url")
+            SubElement(legal_el, "loc").text = f"{self._site_url}/{legal_slug}/"
+            SubElement(legal_el, "lastmod").text = now_iso
+            SubElement(legal_el, "changefreq").text = "monthly"
+            SubElement(legal_el, "priority").text = priority
 
         for section_name, articles in sections.items():
             cat_el = SubElement(urlset, "url")
@@ -650,6 +659,34 @@ class SiteBuilder:
             "",
         ]
         (self.output_dir / "robots.txt").write_text("\n".join(lines), encoding="utf-8")
+
+    def build_legal_pages(self):
+        """生成静态法律页面：/terms/ 和 /privacy/
+        改写为静态文件（不再走 FastAPI），原因：
+        1. 与"纯静态站点"架构一致
+        2. 可被 Nginx / Cloudflare 缓存
+        3. 减少对 web 容器的依赖
+        """
+        # 实际构建日期注入模板，用于"Last updated"显示
+        build_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
+        # 法律页面不需要展示分类导航，但 base.html 强制要求 sections
+        empty_sections = {
+            k: {"count": 0, "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())}
+            for k in CATEGORY_DISPLAY_NAMES
+        }
+        ctx = self._base_ctx(
+            page_type="legal",
+            build_date=build_date,
+            sections=empty_sections,
+        )
+        for slug, tpl_name in [("terms", "terms.html"), ("privacy", "privacy.html")]:
+            template = self.env.get_template(tpl_name)
+            out_dir = self.output_dir / slug
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "index.html").write_text(
+                template.render(**ctx), encoding="utf-8"
+            )
+        logger.info("Legal pages generated: /terms/, /privacy/")
 
 
 def _escape_xml(text: str) -> str:
