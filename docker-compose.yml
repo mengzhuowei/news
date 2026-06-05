@@ -109,7 +109,7 @@ services:
       - webroot:/var/www/certbot
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://web:8000/subscribe || exit 1"]
+      test: ["CMD-SHELL", "nginx -t && curl -fsS http://web:8000/subscribe || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
