@@ -79,6 +79,18 @@
       isPartOfProductId: "CAow4-zGDA:openaccess",
       clientOptions: { theme: "light", lang: "en" },
     });
+    // 把 SWG 按钮挂到文章顶部 #swg-follow-banner 容器
+    // SWG 会用 Shadow DOM 渲染按钮；容器本身只需保留位置
+    (function attachWhenReady() {
+      var host = document.getElementById('swg-follow-banner');
+      if (!host) return;
+      try {
+        basicSubscriptions.attachButton(host, { theme: 'light' });
+      } catch (e) {
+        // SWG 尚未就绪则稍后重试
+        setTimeout(attachWhenReady, 300);
+      }
+    })();
   });
 </script>
 {% endblock %}
@@ -89,6 +101,96 @@
     <a href="/{{ page.category }}/">{{ page.category | capitalize }}</a><span>›</span>
     <span>{{ page.title }}</span>
 </nav>
+
+{#- Google "Follow on Google News" 关注横幅
+    SWG 会用 Shadow DOM 注入按钮。如果 SWG 脚本被拦截或加载失败，
+    显示降级的"Follow on Google News"链接，避免空容器。 -#}
+<div id="swg-follow-banner" class="swg-follow-banner">
+    <div class="swg-follow-text">
+        <span class="swg-icon" aria-hidden="true">🔔</span>
+        <div>
+            <strong>Follow on Google News</strong>
+            <p>Get notified when {{ site_title }} publishes a new article</p>
+        </div>
+    </div>
+    <noscript>
+        <a class="swg-follow-link"
+           href="https://news.google.com/publications/CAAow4-zGDA?hl=en-US&gl=US&ceid=US:en"
+           target="_blank" rel="noopener">Open in Google News →</a>
+    </noscript>
+</div>
+<style>
+.swg-follow-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf0 100%);
+    border: 1px solid #dadce0;
+    border-left: 4px solid #1a73e8;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0 1.5rem 0;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+.swg-follow-banner:has(swg-popup) {
+    /* SWG 注入组件后，原占位文字隐藏 */
+    display: block;
+    padding: 0.5rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+.swg-follow-text {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex: 1;
+    min-width: 0;
+}
+.swg-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.swg-follow-text strong {
+    display: block;
+    color: #1a1a2e;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.swg-follow-text p {
+    margin: 0;
+    color: #5f6368;
+    font-size: 0.85rem;
+}
+.swg-follow-link {
+    color: #1a73e8;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.swg-follow-link:hover {
+    background: rgba(26, 115, 232, 0.08);
+}
+@media (max-width: 600px) {
+    .swg-follow-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .swg-follow-link {
+        align-self: stretch;
+        text-align: center;
+    }
+}
+</style>
+
 <article class="article-content">
     <span class="source-badge">{{ page.source }}</span>
     <h1>{{ page.title }}</h1>
