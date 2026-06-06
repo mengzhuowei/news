@@ -17,6 +17,7 @@ SITE_BASEURL_DEFAULT = ""
 ADSENSE_CLIENT_ID_DEFAULT = ""
 ADSENSE_SLOT_TOP_DEFAULT = ""
 ADSENSE_SLOT_BOTTOM_DEFAULT = ""
+ADSENSE_SLOT_SIDEBAR_DEFAULT = ""
 GA_ID_DEFAULT = ""
 SWG_PRODUCT_ID_DEFAULT = ""
 SWG_ACCESS_TYPE_DEFAULT = "openaccess"  # 拆分后默认开 access
@@ -66,6 +67,7 @@ class SiteBuilder:
         self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
         self.adsense_slot_top = os.getenv("ADSENSE_SLOT_TOP", ADSENSE_SLOT_TOP_DEFAULT)
         self.adsense_slot_bottom = os.getenv("ADSENSE_SLOT_BOTTOM", ADSENSE_SLOT_BOTTOM_DEFAULT)
+        self.adsense_slot_sidebar = os.getenv("ADSENSE_SLOT_SIDEBAR", ADSENSE_SLOT_SIDEBAR_DEFAULT)
         self.ga_id = os.getenv("GA_ID", GA_ID_DEFAULT)
         self.swg_product_id = os.getenv("SWG_PRODUCT_ID", SWG_PRODUCT_ID_DEFAULT)
         self.swg_access_type = os.getenv("SWG_ACCESS_TYPE", SWG_ACCESS_TYPE_DEFAULT)
@@ -122,6 +124,7 @@ class SiteBuilder:
             "adsense_client_id": self.adsense_client_id,
             "ad_slot_top": self.adsense_slot_top,
             "ad_slot_bottom": self.adsense_slot_bottom,
+            "ad_slot_sidebar": self.adsense_slot_sidebar,
             "ga_id": self.ga_id,
             "swg_product_id": self.swg_product_id,
             "swg_access_type": self.swg_access_type,
