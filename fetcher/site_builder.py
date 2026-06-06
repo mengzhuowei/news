@@ -15,6 +15,8 @@ from loguru import logger
 SITE_TITLE_DEFAULT = "Global News Digest"
 SITE_BASEURL_DEFAULT = ""
 ADSENSE_CLIENT_ID_DEFAULT = ""
+ADSENSE_SLOT_TOP_DEFAULT = ""
+ADSENSE_SLOT_BOTTOM_DEFAULT = ""
 GA_ID_DEFAULT = ""
 SWG_PRODUCT_ID_DEFAULT = ""
 SWG_ACCESS_TYPE_DEFAULT = "openaccess"  # 拆分后默认开 access
@@ -62,6 +64,8 @@ class SiteBuilder:
         self.site_title = os.getenv("SITE_TITLE", SITE_TITLE_DEFAULT)
         self.site_baseurl = os.getenv("SITE_BASEURL", SITE_BASEURL_DEFAULT)
         self.adsense_client_id = os.getenv("ADSENSE_CLIENT_ID", ADSENSE_CLIENT_ID_DEFAULT)
+        self.adsense_slot_top = os.getenv("ADSENSE_SLOT_TOP", ADSENSE_SLOT_TOP_DEFAULT)
+        self.adsense_slot_bottom = os.getenv("ADSENSE_SLOT_BOTTOM", ADSENSE_SLOT_BOTTOM_DEFAULT)
         self.ga_id = os.getenv("GA_ID", GA_ID_DEFAULT)
         self.swg_product_id = os.getenv("SWG_PRODUCT_ID", SWG_PRODUCT_ID_DEFAULT)
         self.swg_access_type = os.getenv("SWG_ACCESS_TYPE", SWG_ACCESS_TYPE_DEFAULT)
@@ -116,6 +120,8 @@ class SiteBuilder:
             "site_baseurl": self.site_baseurl,
             "site_url": site_url,
             "adsense_client_id": self.adsense_client_id,
+            "ad_slot_top": self.adsense_slot_top,
+            "ad_slot_bottom": self.adsense_slot_bottom,
             "ga_id": self.ga_id,
             "swg_product_id": self.swg_product_id,
             "swg_access_type": self.swg_access_type,

@@ -50,6 +50,7 @@
     {% block head %}{% endblock %}
     {% if adsense_client_id %}
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_client_id }}" crossorigin="anonymous"></script>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({google_ad_client: "{{ adsense_client_id }}", enable_page_level_ads: false});</script>
     {% endif %}
 </head>
 <body{% if page_type %} data-page-type="{{ page_type }}"{% if section_name %} data-section="{{ section_name }}"{% endif %}{% if article_id %} data-article-id="{{ article_id }}" data-article-title="{{ article_title | default('') }}" data-article-source="{{ article_source | default('') }}" data-article-category="{{ article_category | default('') }}"{% endif %}{% endif %}>
