@@ -21,6 +21,13 @@ SWG_ACCESS_TYPE_DEFAULT = "openaccess"  # 拆分后默认开 access
 TWITTER_USERNAME_DEFAULT = ""
 TWITTER_CREATOR_DEFAULT = ""
 TELEGRAM_BOT_USERNAME_DEFAULT = ""
+CONTACT_EMAIL_DEFAULT = ""
+COPYRIGHT_EMAIL_DEFAULT = ""
+PARTNERSHIPS_EMAIL_DEFAULT = ""
+
+# Email 简单校验：要求基本邮箱格式，避免把垃圾值写进 HTML
+import re as _re_email
+_EMAIL_RE = _re_email.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ARTICLES_PER_PAGE = 20
 
 CATEGORY_DISPLAY_NAMES = {
@@ -66,6 +73,20 @@ class SiteBuilder:
             )
             self.swg_access_type = SWG_ACCESS_TYPE_DEFAULT
         self.telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", TELEGRAM_BOT_USERNAME_DEFAULT)
+        # 三个联系邮箱：未配置时为空字符串（模板里会整段隐藏）
+        raw_contact = os.getenv("CONTACT_EMAIL", CONTACT_EMAIL_DEFAULT)
+        raw_copyright = os.getenv("COPYRIGHT_EMAIL", COPYRIGHT_EMAIL_DEFAULT)
+        raw_partner = os.getenv("PARTNERSHIPS_EMAIL", PARTNERSHIPS_EMAIL_DEFAULT)
+        # 简单格式校验：不合法的当成空（避免把垃圾值塞进 HTML）
+        self.contact_email = raw_contact if _EMAIL_RE.match(raw_contact) else ""
+        self.copyright_email = raw_copyright if _EMAIL_RE.match(raw_copyright) else ""
+        self.partnerships_email = raw_partner if _EMAIL_RE.match(raw_partner) else ""
+        if raw_contact and not self.contact_email:
+            logger.warning(f"CONTACT_EMAIL={raw_contact!r} is not a valid email, ignoring")
+        if raw_copyright and not self.copyright_email:
+            logger.warning(f"COPYRIGHT_EMAIL={raw_copyright!r} is not a valid email, ignoring")
+        if raw_partner and not self.partnerships_email:
+            logger.warning(f"PARTNERSHIPS_EMAIL={raw_partner!r} is not a valid email, ignoring")
         self.twitter_site = os.getenv("TWITTER_SITE", TWITTER_USERNAME_DEFAULT)
         self.twitter_creator = os.getenv("TWITTER_CREATOR", TWITTER_CREATOR_DEFAULT)
         if not self.site_baseurl:
@@ -99,6 +120,9 @@ class SiteBuilder:
             "swg_product_id": self.swg_product_id,
             "swg_access_type": self.swg_access_type,
             "telegram_bot_username": self.telegram_bot_username,
+            "contact_email": self.contact_email,
+            "copyright_email": self.copyright_email,
+            "partnerships_email": self.partnerships_email,
             "twitter_site": self.twitter_site,
             "twitter_creator": self.twitter_creator,
         }
@@ -434,10 +458,12 @@ class SiteBuilder:
         pages_urlset = Element("urlset")
         pages_urlset.set("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9")
         pages_urlset.set("xmlns:image", "http://www.google.com/schemas/sitemap-image/1.1")
+        # /contact/ 是 Google 评估 E-E-A-T（信任度）的重要因素
         for loc, lastmod, changefreq, priority in [
             (f"{self._site_url}/", now_iso, "hourly", "1.0"),
             (f"{self._site_url}/terms/", now_iso, "monthly", "0.9"),
             (f"{self._site_url}/privacy/", now_iso, "monthly", "0.9"),
+            (f"{self._site_url}/contact/", now_iso, "monthly", "0.7"),
         ]:
             el = SubElement(pages_urlset, "url")
             SubElement(el, "loc").text = loc
@@ -712,7 +738,7 @@ class SiteBuilder:
         (self.output_dir / "robots.txt").write_text("\n".join(lines), encoding="utf-8")
 
     def build_legal_pages(self, sections: dict):
-        """生成静态法律页面：/terms/ 和 /privacy/
+        """生成静态支持页面：/terms/、/privacy/、/contact/
         改写为静态文件（不再走 FastAPI），原因：
         1. 与"纯静态站点"架构一致
         2. 可被 Nginx / Cloudflare 缓存
@@ -728,14 +754,18 @@ class SiteBuilder:
             build_date=build_date,
             sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
-        for slug, tpl_name in [("terms", "terms.html"), ("privacy", "privacy.html")]:
+        for slug, tpl_name in [
+            ("terms", "terms.html"),
+            ("privacy", "privacy.html"),
+            ("contact", "contact.html"),
+        ]:
             template = self.env.get_template(tpl_name)
             out_dir = self.output_dir / slug
             out_dir.mkdir(parents=True, exist_ok=True)
             (out_dir / "index.html").write_text(
                 template.render(**ctx), encoding="utf-8"
             )
-        logger.info("Legal pages generated: /terms/, /privacy/")
+        logger.info("Support pages generated: /terms/, /privacy/, /contact/")
 
 
 def _escape_xml(text: str) -> str:

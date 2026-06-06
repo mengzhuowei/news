@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Contact Us - {{ site_title }}{% endblock %}
+{% block description %}Get in touch with the {{ site_title }} team.{% endblock %}
+{% block canonical_url %}{{ site_url }}/contact/{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span>›</span>
+    <span>Contact</span>
+</nav>
+
+<article style="max-width: 700px; margin: 0 auto; background: white; border-radius: 12px; padding: 2.5rem 3rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); line-height: 1.7;">
+    <h1 style="font-size: 1.8rem; color: #1a1a2e; margin-bottom: 1.5rem;">Contact Us</h1>
+
+    <p>For general inquiries, partnership opportunities, copyright complaints,
+    or any other matters, please reach out using the channels below.</p>
+
+    {#- 三个邮箱字段：未配置时整段不渲染 -#}
+    {% if contact_email or copyright_email or partnerships_email %}
+    <h2 style="font-size: 1.2rem; color: #1a1a2e; margin: 1.5rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">📧 Email</h2>
+
+    {% if contact_email %}
+    <p>
+        <strong>General inquiries:</strong>
+        <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+    </p>
+    {% endif %}
+
+    {% if copyright_email %}
+    <p>
+        <strong>Copyright / DMCA:</strong>
+        <a href="mailto:{{ copyright_email }}">{{ copyright_email }}</a>
+        <br>
+        <span style="color: #5f6368; font-size: 0.9rem;">
+            If you are a copyright holder and believe content has been used in
+            a manner that violates your rights, please contact us for prompt removal.
+        </span>
+    </p>
+    {% endif %}
+
+    {% if partnerships_email %}
+    <p>
+        <strong>Advertising &amp; partnerships:</strong>
+        <a href="mailto:{{ partnerships_email }}">{{ partnerships_email }}</a>
+    </p>
+    {% endif %}
+    {% endif %}
+
+    <h2 style="font-size: 1.2rem; color: #1a1a2e; margin: 1.5rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">💬 Telegram</h2>
+    <p>
+        {% if telegram_bot_username %}
+        <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener">@{{ telegram_bot_username }}</a>
+        {% else %}
+        <span style="color: #888;">Telegram bot: not configured</span>
+        {% endif %}
+    </p>
+
+    <h2 style="font-size: 1.2rem; color: #1a1a2e; margin: 1.5rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">🌐 Online Resources</h2>
+    <ul>
+        <li><a href="/terms">Terms of Service</a></li>
+        <li><a href="/privacy">Privacy Policy</a></li>
+        <li><a href="/subscribe">Subscribe to daily digests</a></li>
+    </ul>
+
+    <h2 style="font-size: 1.2rem; color: #1a1a2e; margin: 1.5rem 0 0.6rem; padding-top: 1rem; border-top: 1px solid #eee;">⏱ Response Time</h2>
+    <p>We typically respond to email inquiries within <strong>1-3 business days</strong>.
+    Copyright / DMCA notices are handled with priority, usually within 24 hours.</p>
+</article>
+
+<p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+    <a href="/">← Back to homepage</a>
+</p>
+{% endblock %}
