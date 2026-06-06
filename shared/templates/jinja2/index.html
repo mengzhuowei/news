@@ -64,7 +64,7 @@
         {% if hero_article %}
         <div class="hero">
             {% if hero_article.image %}
-            <a href="{{ hero_article.permalink }}"><img src="{{ hero_article.image }}" alt="{{ hero_article.title }}" width="800" height="300"></a>
+            <a href="{{ hero_article.permalink }}"><img src="{{ hero_article.image }}" alt="{{ hero_article.title }}" loading="lazy" onload="if(this.naturalWidth<this.parentElement.offsetWidth*0.6)this.parentElement.classList.add('hero-float')"></a>
             {% endif %}
             <div class="hero-content">
                 <span class="source-badge">{{ hero_article.source }}</span>
