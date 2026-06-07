@@ -554,9 +554,11 @@ class SiteBuilder:
                 if article["date"] < cutoff:
                     continue
 
+                # Google News 流量加 UTM，让 GA4 正确归因到 Organic 而非 Unassigned
+                news_url = article["permalink"] + "?utm_source=google_news&utm_medium=referral&utm_campaign=google_news"
                 parts = [
                     "  <url>",
-                    f"    <loc>{_escape_xml(article['permalink'])}</loc>",
+                    f"    <loc>{_escape_xml(news_url)}</loc>",
                     "    <news:news>",
                     "      <news:publication>",
                     f"        <news:name>{_escape_xml(self.site_title)}</news:name>",

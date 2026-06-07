@@ -78,7 +78,7 @@
         {% endif %}
 
         {% if hero_side_articles %}
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+        <div class="hero-side-grid">
             {% for article in hero_side_articles %}
             <div class="article-card article-card-side">
                 <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
