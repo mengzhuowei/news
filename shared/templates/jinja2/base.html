@@ -92,5 +92,29 @@
             </p>
         </div>
     </footer>
+    <script>
+    // 防止 AdSense 在移动端以固定宽度撑开页面
+    (function() {
+        function fixAds(root) {
+            (root || document).querySelectorAll('ins.adsbygoogle').forEach(function(ins) {
+                ins.style.maxWidth = '100%';
+                ins.style.width = '100%';
+                ins.style.minWidth = '0';
+            });
+            (root || document).querySelectorAll('ins.adsbygoogle iframe').forEach(function(f) {
+                var w = Math.min(f.clientWidth || 430, f.parentElement.clientWidth || 430);
+                f.style.maxWidth = '100%';
+                f.style.minWidth = '0';
+                if (w > 0) f.style.width = w + 'px';
+            });
+        }
+        fixAds();
+        var mo = new MutationObserver(function(muts) {
+            muts.forEach(function(m) { m.addedNodes.forEach(function(n) { if (n.nodeType === 1) fixAds(n); }); });
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('resize', fixAds);
+    })();
+    </script>
 </body>
 </html>
