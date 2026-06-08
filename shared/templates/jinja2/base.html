@@ -95,25 +95,30 @@
     <script>
     // 防止 AdSense 在移动端以固定宽度撑开页面
     (function() {
-        function fixAds(root) {
-            (root || document).querySelectorAll('ins.adsbygoogle').forEach(function(ins) {
+        function fixAds() {
+            document.querySelectorAll('ins.adsbygoogle').forEach(function(ins) {
                 ins.style.maxWidth = '100%';
-                ins.style.width = '100%';
                 ins.style.minWidth = '0';
+                ins.style.width = '100%';
             });
-            (root || document).querySelectorAll('ins.adsbygoogle iframe').forEach(function(f) {
-                var w = Math.min(f.clientWidth || 430, f.parentElement.clientWidth || 430);
-                f.style.maxWidth = '100%';
-                f.style.minWidth = '0';
-                if (w > 0) f.style.width = w + 'px';
+            document.querySelectorAll('ins.adsbygoogle iframe').forEach(function(f) {
+                var pw = (f.parentElement && f.parentElement.clientWidth) || 0;
+                if (pw > 0) {
+                    f.style.maxWidth = '100%';
+                    f.style.minWidth = '0';
+                    f.style.width = pw + 'px';
+                }
             });
         }
         fixAds();
-        var mo = new MutationObserver(function(muts) {
-            muts.forEach(function(m) { m.addedNodes.forEach(function(n) { if (n.nodeType === 1) fixAds(n); }); });
-        });
-        mo.observe(document.body, { childList: true, subtree: true });
+        var mo = new MutationObserver(fixAds);
+        mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
         window.addEventListener('resize', fixAds);
+        // 反复重试：AdSense 异步注入后会回写 style
+        var tries = 0, iv = setInterval(function() {
+            fixAds();
+            if (++tries > 30) clearInterval(iv);
+        }, 200);
     })();
     </script>
 </body>
