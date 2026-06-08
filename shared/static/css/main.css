@@ -123,9 +123,10 @@ footer { background: #1a1a2e; color: #aaa; text-align: center; padding: 1.5rem 0
 .article-content h1 { font-size: 2rem; margin-bottom: 1rem; }
 .article-content .content-body { line-height: 1.8; }
 .article-content .content-body p { margin-bottom: 1rem; }
-.ad-slot { margin: 1.5rem 0; text-align: center; min-height: 90px; max-height: 250px; overflow: hidden; }
-.ad-slot ins { max-width: 100% !important; }
-.ad-slot iframe { max-width: 100% !important; max-height: 250px !important; }
+.ad-slot { margin: 1.5rem 0; text-align: center; min-height: 90px; max-height: 280px; overflow: hidden; }
+.ad-slot ins { max-width: 100% !important; width: 100% !important; min-width: 0 !important; }
+.ad-slot iframe { max-width: 100% !important; min-width: 0 !important; }
+.ad-slot [id^="aswift_"][id$="_host"] { max-width: 100% !important; min-width: 0 !important; }
 .ad-slot-top { margin-top: 0; }
 .ad-slot-bottom { margin-bottom: 0; }
 .breadcrumb { font-size: 0.85rem; color: #ccc; margin-bottom: 1.5rem; padding-left: 8px; }

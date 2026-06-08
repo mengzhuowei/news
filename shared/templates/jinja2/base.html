@@ -96,17 +96,30 @@
     // 防止 AdSense 在移动端以固定宽度撑开页面
     (function() {
         function fixAds() {
+            // ins.adsbygoogle 容器
             document.querySelectorAll('ins.adsbygoogle').forEach(function(ins) {
                 ins.style.maxWidth = '100%';
                 ins.style.minWidth = '0';
                 ins.style.width = '100%';
             });
+            // AdSense 自动创建的宿主 div (#aswift_X_host)
+            document.querySelectorAll('[id^="aswift_"][id$="_host"]').forEach(function(host) {
+                var pw = (host.parentElement && host.parentElement.clientWidth) || 0;
+                if (pw > 0) {
+                    host.style.maxWidth = '100%';
+                    host.style.minWidth = '0';
+                    host.style.width = pw + 'px';
+                    host.style.height = 'auto';
+                }
+            });
+            // 实际渲染广告的 iframe
             document.querySelectorAll('ins.adsbygoogle iframe').forEach(function(f) {
                 var pw = (f.parentElement && f.parentElement.clientWidth) || 0;
                 if (pw > 0) {
                     f.style.maxWidth = '100%';
                     f.style.minWidth = '0';
                     f.style.width = pw + 'px';
+                    f.style.height = 'auto';
                 }
             });
         }
