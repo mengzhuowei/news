@@ -214,16 +214,15 @@
 </style>
 
 <article class="article-content">
+    {% if page.image %}
+    <img class="article-img" src="{{ page.image }}" alt="{{ page.title }}" loading="lazy">
+    {% endif %}
     <span class="source-badge">{{ page.source }}</span>
     <h1>{{ page.title }}</h1>
     <div class="article-meta" style="margin-bottom: 1.5rem;">
         <time datetime="{{ page.published_iso }}">{{ page.published_display }}</time> &middot; {{ page.author }} &middot;
         <a href="{{ page.source_url }}" target="_blank" rel="nofollow noopener">Original Source</a>
     </div>
-
-    {% if page.image %}
-    <img class="article-img" src="{{ page.image }}" alt="{{ page.title }}" loading="lazy" width="800" height="450">
-    {% endif %}
 
     {#- 广告位1：文章顶部横幅广告 -#}
     {% if adsense_client_id %}
