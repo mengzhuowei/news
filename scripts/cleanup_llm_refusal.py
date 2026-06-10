@@ -26,11 +26,18 @@ LLM_REFUSAL_PATTERNS = [
 
 
 def is_llm_refusal(content: str) -> bool:
-    """检测是否为 LLM 拒绝话术"""
+    """检测是否为 LLM 拒绝话术或只有 Source 标注的空内容"""
     if not content:
         return True
     content_lower = content.lower()
-    return any(p in content_lower for p in LLM_REFUSAL_PATTERNS)
+    # LLM 拒绝话术
+    if any(p in content_lower for p in LLM_REFUSAL_PATTERNS):
+        return True
+    # 空内容：只有 Source 标注行（无正文）
+    content_stripped = content.strip()
+    if content_stripped.startswith("---") and "**Source:**" in content_stripped:
+        return True
+    return False
 
 
 def find_affected_urls() -> list[tuple[int, str]]:

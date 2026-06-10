@@ -385,7 +385,14 @@ class SiteBuilder:
         content_lower = content.lower()
         is_llm_refusal = any(phrase in content_lower for phrase in low_quality_phrases)
 
-        low_quality = word_count < 150 or is_llm_refusal
+        # 空内容检测：content 只有 Source 标注行（无正文）
+        # 典型模式："---\n**Source:** https://...\n*Generated at: ...*"
+        content_stripped = content.strip()
+        is_source_only = (
+            content_stripped.startswith("---") and "**Source:**" in content_stripped
+        ) if content_stripped else True
+
+        low_quality = word_count < 150 or is_llm_refusal or is_source_only
 
         ctx = self._base_ctx(
             page=article,
@@ -598,7 +605,13 @@ class SiteBuilder:
                 )
                 is_llm_refusal = any(p in content.lower() for p in llm_refusal_phrases)
 
-                if word_count < MIN_WORDCOUNT or is_llm_refusal:
+                # 空内容检测：content 只有 Source 标注行（无正文）
+                content_stripped = content.strip()
+                is_source_only = (
+                    content_stripped.startswith("---") and "**Source:**" in content_stripped
+                ) if content_stripped else True
+
+                if word_count < MIN_WORDCOUNT or is_llm_refusal or is_source_only:
                     skipped_low_quality += 1
                     continue
 
