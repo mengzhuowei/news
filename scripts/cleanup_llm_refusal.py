@@ -33,6 +33,20 @@ def is_llm_refusal(content: str) -> bool:
     return any(p in content_lower for p in LLM_REFUSAL_PATTERNS)
 
 
+def is_low_quality(content: str, min_words: int = 150) -> bool:
+    """检测是否为低质量内容（wordCount 太短或只有 source 行）"""
+    if not content:
+        return True
+    word_count = len(content.split())
+    if word_count < min_words:
+        return True
+    # 只有 source 行没有实际正文
+    stripped = content.strip().lower()
+    if stripped.startswith("---") and "source:" in stripped and word_count < 50:
+        return True
+    return False
+
+
 def find_affected_urls() -> list[tuple[int, str]]:
     """查找受影响的文章 ID 和 permalink 形式
     不再过滤 is_built——如果文章正文是 LLM 拒绝话术，无论是否构建过都该清理
@@ -44,7 +58,7 @@ def find_affected_urls() -> list[tuple[int, str]]:
         # 但前端构建时已跳过的脏数据
         articles = db.query(Article).all()
         for a in articles:
-            if is_llm_refusal(a.content or ""):
+            if is_llm_refusal(a.content or "") or is_low_quality(a.content or ""):
                 # 构造文章 URL 路径：/category/date/slug/
                 if not a.slug or not a.category or not a.published_at:
                     continue
