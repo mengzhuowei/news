@@ -368,8 +368,24 @@ class SiteBuilder:
 
         # 低质量判定：wordCount 太短、空内容、AI 重写失败残留
         # 阈值与 news-sitemap 保持一致（MIN_WORDCOUNT = 150）
-        word_count = len((article.get("content") or "").split())
-        low_quality = word_count < 150
+        content = article.get("content") or ""
+        word_count = len(content.split())
+
+        # LLM 拒绝话术检测：识别 "no article body to rewrite" 等
+        # 这种情况 wordCount 可能超过 150 阈值，必须用关键词兜底
+        low_quality_phrases = (
+            "no original article body to rewrite",
+            "no factual content, numbers, or data are available",
+            "no content to rewrite",
+            "no content was provided",
+            "no article body",
+            "the provided text contains only a title",
+            "no original content to process",
+        )
+        content_lower = content.lower()
+        is_llm_refusal = any(phrase in content_lower for phrase in low_quality_phrases)
+
+        low_quality = word_count < 150 or is_llm_refusal
 
         ctx = self._base_ctx(
             page=article,
@@ -566,8 +582,23 @@ class SiteBuilder:
                     continue
 
                 # 质量过滤：wordCount 太短的不收录到 news-sitemap
-                word_count = len((article.get("content") or "").split())
-                if word_count < MIN_WORDCOUNT:
+                content = article.get("content") or ""
+                word_count = len(content.split())
+
+                # LLM 拒绝话术检测：识别 "no article body to rewrite" 等
+                # 即使 wordCount 超过 150，只要命中关键词也视为低质量
+                llm_refusal_phrases = (
+                    "no original article body to rewrite",
+                    "no factual content, numbers, or data are available",
+                    "no content to rewrite",
+                    "no content was provided",
+                    "no article body",
+                    "the provided text contains only a title",
+                    "no original content to process",
+                )
+                is_llm_refusal = any(p in content.lower() for p in llm_refusal_phrases)
+
+                if word_count < MIN_WORDCOUNT or is_llm_refusal:
                     skipped_low_quality += 1
                     continue
 
