@@ -34,13 +34,15 @@ def is_llm_refusal(content: str) -> bool:
 
 
 def find_affected_urls() -> list[tuple[int, str]]:
-    """查找受影响的文章 ID 和 permalink 形式"""
+    """查找受影响的文章 ID 和 permalink 形式
+    不再过滤 is_built——如果文章正文是 LLM 拒绝话术，无论是否构建过都该清理
+    """
     from urllib.parse import urlparse
     affected = []
     with get_session() as db:
-        articles = db.query(Article).filter(
-            Article.is_built == True  # noqa: E712
-        ).all()
+        # 不加 is_built 过滤，因为 dist/ 里可能存在
+        # 但前端构建时已跳过的脏数据
+        articles = db.query(Article).all()
         for a in articles:
             if is_llm_refusal(a.content or ""):
                 # 构造文章 URL 路径：/category/date/slug/
