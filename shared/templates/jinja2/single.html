@@ -26,7 +26,18 @@
 <meta property="article:published_time" content="{{ page.published_iso }}">
 <meta property="article:author" content="{{ page.author }}">
 <meta property="article:section" content="{{ page.category }}">
+{% if page.video_url %}
+<meta property="og:video" content="{{ page.video_url }}">
+<meta property="og:video:type" content="{% if page.video_url.endswith('.mp4') %}video/mp4{% elif page.video_url.endswith('.webm') %}video/webm{% else %}text/html{% endif %}">
+<meta property="og:video:width" content="1280">
+<meta property="og:video:height" content="720">
+<meta name="twitter:card" content="player">
+<meta name="twitter:player" content="{{ page.video_url }}">
+<meta name="twitter:player:width" content="1280">
+<meta name="twitter:player:height" content="720">
+{% else %}
 <meta name="twitter:card" content="summary_large_image">
+{% endif %}
 <meta name="twitter:title" content="{{ page.title }}">
 <meta name="twitter:description" content="{{ page_description }}">
 {% if page.image %}
@@ -72,6 +83,32 @@
     ]
 }
 </script>
+{%- if page.video_url %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    "name": {{ page.title | tojson }},
+    "description": {{ page_description | tojson }},
+    "thumbnailUrl": [{{ (page.image or site_url ~ '/logo.png') | tojson }}],
+    "uploadDate": {{ page.published_iso | tojson }},
+    {% if page.video_duration %}"duration": {{ page.video_duration | tojson }},{% endif %}
+    {% if page.video_url.endswith(('.mp4', '.webm', '.ogg')) %}
+    "contentUrl": {{ page.video_url | tojson }},
+    {% else %}
+    "embedUrl": {{ page.video_url | tojson }},
+    {% endif %}
+    "publisher": {
+        "@type": "Organization",
+        "name": {{ site_title | tojson }},
+        "logo": {
+            "@type": "ImageObject",
+            "url": "{{ site_url }}/logo.png"
+        }
+    }
+}
+</script>
+{%- endif %}
 {#- Google Subscribe with Google (SWG) — Google News 订阅入口
     只在配置了 SWG_PRODUCT_ID 时才注入，避免污染未启用 SWG 的部署
     拼接规则：isPartOfProductId = "<product_id>:<access_type>"
@@ -219,7 +256,35 @@
 </style>
 
 <article class="article-content">
-    {% if page.image %}
+    {% if page.video_url %}
+    <div class="video-container">
+        {% if 'youtube.com' in page.video_url or 'youtube-nocookie.com' in page.video_url %}
+        <iframe class="video-iframe" src="{{ page.video_url }}" title="{{ page.title }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+        {% elif 'vimeo.com' in page.video_url or 'player.vimeo.com' in page.video_url %}
+        <iframe class="video-iframe" src="{{ page.video_url }}" title="{{ page.title }}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+        {% elif 'brightcove.net' in page.video_url %}
+        <iframe class="video-iframe" src="{{ page.video_url }}" title="{{ page.title }}" frameborder="0" allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe>
+        {% elif page.video_url.endswith(('.mp4', '.webm', '.ogg')) %}
+        <video class="video-native" controls preload="metadata" poster="{{ page.image }}">
+            <source src="{{ page.video_url }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        {#- 已知阻止第三方嵌入的域名：BBC、NYT 等，显示缩略图+外链 -#}
+        {% elif 'bbc.com' in page.video_url or 'bbc.co.uk' in page.video_url or 'nytimes.com' in page.video_url %}
+        <a href="{{ page.video_url if page.video_url.startswith('http') else page.source_url }}" target="_blank" rel="nofollow noopener" class="video-link-card">
+            {% if page.image %}
+            <img src="{{ page.image }}" alt="{{ page.title }}" class="video-link-thumb" loading="lazy">
+            {% endif %}
+            <div class="video-link-overlay">
+                <span class="video-link-play">&#9654;</span>
+                <span class="video-link-text">Watch on {{ page.source }}</span>
+            </div>
+        </a>
+        {% else %}
+        <iframe class="video-iframe" src="{{ page.video_url }}" title="{{ page.title }}" frameborder="0" allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe>
+        {% endif %}
+    </div>
+    {% elif page.image %}
     <img class="article-img" src="{{ page.image }}" alt="{{ page.title }}" loading="lazy">
     {% endif %}
     <span class="source-badge">{{ page.source }}</span>

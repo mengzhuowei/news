@@ -170,6 +170,85 @@ class ContentEnricher:
         )
         return text if text and len(text) > 100 else None
 
+    def _extract_video_embed(self, html: str, url: str) -> tuple:
+        """从网页 HTML 提取视频嵌入 URL 和时长（ISO 8601 格式）。
+        返回 (video_url, duration) 或 (None, None)。
+        """
+        from bs4 import BeautifulSoup
+        import json as _json
+        soup = BeautifulSoup(html, 'lxml')
+
+        # 1. 查找 iframe 视频嵌入（YouTube / Vimeo / 其他）
+        for iframe in soup.find_all('iframe'):
+            src = iframe.get('src', '')
+            if any(domain in src for domain in (
+                'youtube.com/embed/', 'youtube-nocookie.com/embed/',
+                'player.vimeo.com/', 'players.brightcove.net/',
+            )):
+                # 确保 URL 协议正确
+                if src.startswith('//'):
+                    src = 'https:' + src
+                return src, None
+
+        # 2. 查找 <video> 标签中的 source
+        video_tag = soup.find('video')
+        if video_tag:
+            source = video_tag.find('source')
+            if source and source.get('src'):
+                # 尝试从 duration 属性获取时长
+                duration = video_tag.get('duration')
+                return source['src'], self._format_duration(duration) if duration else None
+
+        # 3. 查找 JSON-LD 中的 embedUrl / duration
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = _json.loads(script.string or '')
+                embed_url = data.get('embedUrl')
+                duration = data.get('duration')
+                if embed_url:
+                    return embed_url, duration
+                # VideoObject 类型
+                if data.get('@type') == 'VideoObject':
+                    content_url = data.get('contentUrl') or data.get('embedUrl')
+                    if content_url:
+                        return content_url, duration
+            except (_json.JSONDecodeError, TypeError):
+                continue
+
+        # 4. BBC 特殊处理：BBC 阻止第三方 iframe 嵌入
+        # 存储原始文章 URL，模板会显示 "Watch on BBC" 外链卡片
+        if 'bbc.com' in url or 'bbc.co.uk' in url:
+            video_el = soup.find(attrs={'data-video-id': True})
+            if video_el:
+                return url, None
+
+        # 5. NYT 特殊处理：NYT 也阻止第三方嵌入
+        # 同样存储原始文章 URL
+        if 'nytimes.com' in url:
+            meta = soup.find('meta', attrs={'property': 'og:video:url'}) or \
+                    soup.find('meta', attrs={'property': 'og:video'})
+            if meta and meta.get('content'):
+                return url, None
+
+        return None, None
+
+    @staticmethod
+    def _format_duration(seconds) -> Optional[str]:
+        """将秒数转换为 ISO 8601 duration 格式（PT1H2M3S）"""
+        try:
+            s = int(float(seconds))
+            h, remainder = divmod(s, 3600)
+            m, s = divmod(remainder, 60)
+            parts = ['PT']
+            if h:
+                parts.append(f'{h}H')
+            if m:
+                parts.append(f'{m}M')
+            parts.append(f'{s}S')
+            return ''.join(parts)
+        except (ValueError, TypeError):
+            return None
+
     async def enrich(self, article: Article) -> Article:
         """充实单篇文章"""
         if not self.enabled or not self._needs_enrichment(article) or not article.url:
@@ -181,6 +260,12 @@ class ContentEnricher:
                 full_text = await asyncio.to_thread(self._extract_content, html, article.url)
                 if full_text:
                     article.content = full_text
+                # 提取视频嵌入 URL 和时长
+                video_url, video_duration = self._extract_video_embed(html, article.url)
+                if video_url:
+                    article.video_url = video_url
+                if video_duration:
+                    article.video_duration = video_duration
             return article
 
     async def enrich_batch(self, articles: List[Article]) -> List[Article]:

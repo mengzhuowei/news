@@ -31,6 +31,8 @@ class Article:
     image_url: Optional[str] = None
     language: str = "en"
     rewritten: bool = False
+    video_url: Optional[str] = None
+    video_duration: Optional[str] = None
 
 
 class BaseFetcher(ABC):
@@ -111,6 +113,8 @@ class BaseFetcher(ABC):
                 category=self.category,
                 author=entry.get('author', ''),
                 image_url=self._extract_image(entry),
+                video_url=self._extract_video_url(entry),
+                video_duration=None,
             )
         except Exception as e:
             logger.error(f"[{self.source_name}] Parse error: {e}")
@@ -148,6 +152,48 @@ class BaseFetcher(ABC):
                 img = soup.find('img')
                 if img and img.get('src', '').startswith(('http://', 'https://')):
                     return img['src']
+
+        return None
+
+    def _extract_video_url(self, entry) -> Optional[str]:
+        """从 RSS 条目提取视频嵌入 URL（YouTube / Vimeo / 媒体自有播放器）"""
+        # 1. 检查 media:content 中的视频
+        if 'media_content' in entry:
+            for media in entry.media_content:
+                medium = media.get('medium', '')
+                mtype = media.get('type', '')
+                url = media.get('url', '')
+                if medium == 'video' or (mtype and mtype.startswith('video/')):
+                    return url
+
+        # 2. 检查 enclosures 中的视频
+        if 'enclosures' in entry and entry.enclosures:
+            for enc in entry.enclosures:
+                if enc.get('type', '').startswith('video/'):
+                    return enc.get('href') or enc.get('url')
+
+        # 3. 从 content/summary HTML 中提取 iframe 视频嵌入
+        for field_name in ('content', 'summary', 'description'):
+            html = entry.get(field_name, '')
+            if isinstance(html, list) and html:
+                html = html[0].get('value', '')
+            if html:
+                soup = BeautifulSoup(html, 'lxml')
+                for iframe in soup.find_all('iframe'):
+                    src = iframe.get('src', '')
+                    if any(domain in src for domain in (
+                        'youtube.com/embed/', 'youtube-nocookie.com/embed/',
+                        'youtu.be/', 'vimeo.com/', 'player.vimeo.com/',
+                    )):
+                        return src
+
+        # 4. 从文章 URL 检测视频页（BBC /news/videos/ 等）
+        # BBC 阻止第三方 iframe 嵌入，存储原始文章 URL
+        # 模板会显示 "Watch on BBC" 外链卡片而非 iframe
+        url = entry.get('link', '')
+        if '/videos/' in url or '/video/' in url:
+            if 'bbc.com' in url or 'bbc.co.uk' in url:
+                return url
 
         return None
 

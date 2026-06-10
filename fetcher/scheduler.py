@@ -309,6 +309,8 @@ class FetchScheduler:
                     category=article.category,
                     author=(article.author or 'Unknown')[:255],
                     image_url=article.image_url or '',
+                    video_url=article.video_url or '',
+                    video_duration=getattr(article, 'video_duration', None) or '',
                     is_rewritten=article.rewritten,
                     published_at=article.published,
                     slug=make_slug(article.source, article.title, 0),

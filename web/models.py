@@ -21,6 +21,8 @@ class Article(Base):
     category = Column(String(100))
     author = Column(Text, default='Unknown')
     image_url = Column(String(1024), default='')
+    video_url = Column(String(1024), default='')
+    video_duration = Column(String(32), default='')
     slug = Column(String(256), default='')
     is_rewritten = Column(Boolean, default=False)
     is_built = Column(Boolean, default=False)

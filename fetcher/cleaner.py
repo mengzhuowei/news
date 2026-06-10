@@ -77,7 +77,7 @@ class ContentCleaner:
         self._hash_buckets.clear()
 
     def clean(self, article: Article) -> Optional[Article]:
-        """清洗文章，重复则返回 None"""
+        """清洗文章，重复或内容过短则返回 None"""
         try:
             if self._is_duplicate(article):
                 return None
@@ -88,6 +88,14 @@ class ContentCleaner:
             article.summary = self._remove_ads(article.summary)
             article.content = self._normalize_text(article.content)
             article.summary = self._normalize_text(article.summary)
+
+            # 内容过短过滤：清洗后正文少于 200 个字符视为无实质内容
+            # 典型案例：Bloomberg 播客列表、纯链接页、仅标题+来源的条目
+            # 但有视频嵌入的文章例外 — 视频本身就是内容
+            # 200 字符 ≈ 30-40 英文单词，低于此阈值几乎无信息量
+            if len(article.content.strip()) < 200 and not article.video_url:
+                logger.debug(f"[Cleaner] Skipped short content: {article.title[:60]}")
+                return None
 
             article_hash = self.simhash.compute(article.title + article.content)
             self._add_hash(article_hash)

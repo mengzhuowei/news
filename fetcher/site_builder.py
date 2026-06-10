@@ -190,6 +190,8 @@ class SiteBuilder:
                         "source_url": a.url or "",
                         "author": a.author or "Unknown",
                         "image": a.image_url or "",
+                        "video_url": a.video_url or "",
+                        "video_duration": getattr(a, 'video_duration', None) or "",
                         "date": date,
                         "date_path": date_path,
                         "published_iso": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -273,6 +275,7 @@ class SiteBuilder:
             self.build_homepage(sections)
             self.build_sitemap(sections)
             self.build_news_sitemap(sections)
+            self.build_video_sitemap(sections)
             self.build_rss(sections)
             self.build_robots_txt()
             self.build_legal_pages(sections)
@@ -662,6 +665,66 @@ class SiteBuilder:
             f"{skipped_low_quality} skipped for low quality)"
         )
 
+    def build_video_sitemap(self, sections: dict):
+        """生成 Google 视频 sitemap（video-sitemap.xml）。
+        仅收录含 video_url 的文章，帮助 Google 在视频搜索结果中展示。
+        参考：https://developers.google.com/search/docs/crawling-indexing/sitemaps/video-sitemap
+        """
+        items: list[str] = []
+        total = 0
+
+        for articles in sections.values():
+            for article in articles:
+                if not article.get("video_url"):
+                    continue
+
+                # 区分原生视频文件 vs 第三方嵌入：
+                # content_loc = 视频文件直接 URL（.mp4/.webm/.ogg）
+                # player_loc = 第三方播放器嵌入 URL（YouTube/Vimeo 等）
+                # 两者不应同时填写，否则 Google 可能混淆导致视频不被索引
+                video_url = article['video_url']
+                is_native_video = any(video_url.lower().endswith(ext) for ext in ('.mp4', '.webm', '.ogg'))
+
+                parts = [
+                    "  <url>",
+                    f"    <loc>{_escape_xml(article['permalink'])}</loc>",
+                    "    <video:video>",
+                    f"      <video:thumbnail_loc>{_escape_xml(article.get('image') or self._site_url + '/logo.png')}</video:thumbnail_loc>",
+                    f"      <video:title><![CDATA[{article['title']}]]></video:title>",
+                    f"      <video:description><![CDATA[{article.get('summary') or ''}]]></video:description>",
+                ]
+                if is_native_video:
+                    parts.append(f"      <video:content_loc>{_escape_xml(video_url)}</video:content_loc>")
+                else:
+                    parts.append(f"      <video:player_loc>{_escape_xml(video_url)}</video:player_loc>")
+                parts += [
+                    f"      <video:publication_date>{_escape_xml(article['published_iso'])}</video:publication_date>",
+                    "      <video:family_friendly>yes</video:family_friendly>",
+                    f"      <video:live>no</video:live>",
+                ]
+                if article.get("video_duration"):
+                    parts.append(f"      <video:duration>{article['video_duration']}</video:duration>")
+                parts += [
+                    "    </video:video>",
+                    "  </url>",
+                ]
+                items.append("\n".join(parts))
+                total += 1
+                if total >= 50000:  # sitemap 单文件上限
+                    break
+            if total >= 50000:
+                break
+
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+            '        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n'
+            + "\n".join(items) + (items and "\n" or "")
+            + "</urlset>\n"
+        )
+        (self.output_dir / "video-sitemap.xml").write_text(body, encoding="utf-8")
+        logger.info(f"video-sitemap.xml generated ({total} video articles)")
+
     def build_rss(self, sections: dict):
         """生成 RSS feed（全局 + 按分类）"""
         from email.utils import format_datetime
@@ -733,6 +796,7 @@ class SiteBuilder:
         """
         sitemap_url = f"{self._site_url}/sitemap.xml"
         news_sitemap_url = f"{self._site_url}/news-sitemap.xml"
+        video_sitemap_url = f"{self._site_url}/video-sitemap.xml"
 
         # AI 训练爬虫与已知骚扰 UA 名单
         # 涵盖主流 LLM/AI Search/SEO 爬虫与无脑扫描器
@@ -807,6 +871,7 @@ class SiteBuilder:
         lines += [
             f"Sitemap: {sitemap_url}",
             f"Sitemap: {news_sitemap_url}",
+            f"Sitemap: {video_sitemap_url}",
             "",
         ]
         (self.output_dir / "robots.txt").write_text("\n".join(lines), encoding="utf-8")
