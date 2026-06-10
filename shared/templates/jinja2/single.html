@@ -4,7 +4,9 @@
 {% block description %}{{ page_description }}{% endblock %}
 
 {% block head %}
-{% if not page.rewritten or (page.content | length) < 200 %}
+{#- 低质量页面（wordCount < 150 / AI 重写失败）加 noindex, follow -#}
+{#- 避免给整站质量评估拖后腿，但保留内链传递 -#}
+{% if low_quality %}
 <meta name="robots" content="noindex, follow">
 {% endif %}
 <meta name="author" content="{{ page.author }}">

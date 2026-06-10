@@ -366,6 +366,11 @@ class SiteBuilder:
 
         related_articles = self._get_related_articles(article, sections)
 
+        # 低质量判定：wordCount 太短、空内容、AI 重写失败残留
+        # 阈值与 news-sitemap 保持一致（MIN_WORDCOUNT = 150）
+        word_count = len((article.get("content") or "").split())
+        low_quality = word_count < 150
+
         ctx = self._base_ctx(
             page=article,
             page_description=article["description"],
@@ -380,6 +385,7 @@ class SiteBuilder:
             article_category=article.get("category", ""),
             section_name=section_name,
             related_articles=related_articles,
+            low_quality=low_quality,
             sections={k: {"count": len(v), "display_name": CATEGORY_DISPLAY_NAMES.get(k, k.capitalize())} for k, v in sections.items()},
         )
         (out_dir / "index.html").write_text(template.render(**ctx), encoding="utf-8")
@@ -539,6 +545,7 @@ class SiteBuilder:
     def build_news_sitemap(self, sections: dict):
         """生成 Google News 专用 sitemap（news-sitemap.xml）。
         仅收录 48 小时内的文章，避免被 Google News 拒收。
+        同时过滤低质量内容（wordCount 太短），避免给整站质量评估拖后腿。
         使用字符串拼接而不是 ElementTree，避免 ET 在带前缀命名空间
         （如 news:news / image:image）上的序列化 bug。
         参考：https://developers.google.com/search/docs/specialty/news/sitemap-news
@@ -546,12 +553,22 @@ class SiteBuilder:
         from datetime import timedelta
 
         cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+        # news-sitemap 质量阈值：正文太短的页面不应进入 Google News 索引
+        # 阈值根据文章词数估算（按空白分词，与单篇文章 wordCount 一致）
+        MIN_WORDCOUNT = 150
         total = 0
+        skipped_low_quality = 0
         items: list[str] = []
 
         for articles in sections.values():
             for article in articles:
                 if article["date"] < cutoff:
+                    continue
+
+                # 质量过滤：wordCount 太短的不收录到 news-sitemap
+                word_count = len((article.get("content") or "").split())
+                if word_count < MIN_WORDCOUNT:
+                    skipped_low_quality += 1
                     continue
 
                 # Google News 流量加 UTM，让 GA4 正确归因到 Organic 而非 Unassigned
@@ -596,7 +613,10 @@ class SiteBuilder:
             + "</urlset>\n"
         )
         (self.output_dir / "news-sitemap.xml").write_text(body, encoding="utf-8")
-        logger.info(f"news-sitemap.xml generated ({total} articles)")
+        logger.info(
+            f"news-sitemap.xml generated ({total} articles, "
+            f"{skipped_low_quality} skipped for low quality)"
+        )
 
     def build_rss(self, sections: dict):
         """生成 RSS feed（全局 + 按分类）"""
