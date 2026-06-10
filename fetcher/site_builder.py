@@ -731,7 +731,6 @@ class SiteBuilder:
             "Disallow: /search/?",
             "Disallow: /*?q=",
             "Disallow: /*?page=",
-            "Crawl-Delay: 10",
             "",
         ]
         # 2) AI 训练爬虫：整站拒绝

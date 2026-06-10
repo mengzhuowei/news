@@ -4,6 +4,9 @@
 {% block description %}{{ page_description }}{% endblock %}
 
 {% block head %}
+{% if not page.rewritten or (page.content | length) < 200 %}
+<meta name="robots" content="noindex, follow">
+{% endif %}
 <meta name="author" content="{{ page.author }}">
 <meta name="news_keywords" content="{{ page.category }}, {{ page.source }}, {{ site_title }}">
 <meta property="article:tag" content="{{ page.category }}">

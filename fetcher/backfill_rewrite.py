@@ -15,9 +15,8 @@ CONCURRENT = 3
 
 
 async def rewrite_article(summarizer: Summarizer, article_id: int, title: str, content: str) -> tuple[int, str, str, bool]:
-    rewritten_content, rewritten_summary = await summarizer.rewrite(title, content)
-    success = (rewritten_content != content)
-    return article_id, rewritten_content, rewritten_summary, success
+    rewritten_content, rewritten_summary, was_rewritten = await summarizer.rewrite(title, content)
+    return article_id, rewritten_content, rewritten_summary, was_rewritten
 
 
 async def run_backfill(dry_run: bool = False):

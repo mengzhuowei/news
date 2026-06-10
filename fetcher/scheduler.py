@@ -160,13 +160,13 @@ class FetchScheduler:
                 return
 
             async with semaphore:
-                rewritten_content, rewritten_summary = await self.summarizer.rewrite(
+                rewritten_content, rewritten_summary, was_rewritten = await self.summarizer.rewrite(
                     cleaned.title, cleaned.content,
                 )
 
             cleaned.content = rewritten_content
             cleaned.summary = rewritten_summary
-            cleaned.rewritten = True
+            cleaned.rewritten = was_rewritten
             cleaned.content = self.cleaner._add_copyright_notice(cleaned, cleaned.content)
 
             saved = await asyncio.to_thread(self._save_to_db, cleaned)

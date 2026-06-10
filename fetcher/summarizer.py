@@ -112,10 +112,10 @@ class Summarizer:
             logger.error(f"[Summarizer] AI failed: {e}, falling back")
             return self.summarize(title, content)
 
-    async def rewrite(self, title: str, content: str) -> Tuple[str, str]:
-        """AI 重写（洗稿）— 返回 (rewritten_content, rewritten_summary)"""
+    async def rewrite(self, title: str, content: str) -> Tuple[str, str, bool]:
+        """AI 重写（洗稿）— 返回 (rewritten_content, rewritten_summary, was_rewritten)"""
         if not self.api_key:
-            return content, content[:200]
+            return content, content[:200], False
 
         truncated = content[:4000]
 
@@ -130,14 +130,14 @@ class Summarizer:
         # 仍不合格则返回原文
         if not self._is_valid_rewrite(rewritten, truncated):
             logger.warning(f"[Summarizer] Both rewrites invalid for '{title}', using original")
-            return content, content[:200]
+            return content, content[:200], False
 
         # 生成摘要
         summary = await self._call_summary(self.client, title, rewritten)
         if summary is None:
             summary = rewritten[:200]
 
-        return rewritten, summary
+        return rewritten, summary, True
 
     async def _call_rewrite(self, client, title: str, content: str, system_prompt: str) -> Optional[str]:
         try:
