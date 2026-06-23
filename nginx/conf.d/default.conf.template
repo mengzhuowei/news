@@ -14,7 +14,7 @@ map $http_user_agent $is_search_bot {
     ~*(?:facebookexternalhit|Facebot) 1;  # Facebook 分享预览
     ~*(?:Twitterbot|LinkedInBot|Pinterestbot) 1;  # 社交分享预览
     ~*(?:Applebot) 1;                     # Apple Siri/Spotlight 建议（注意不是 Applebot-Extended）
-    ~*(?:Sogou web spider|Sogou inst spider) 1;
+    "~*(?:Sogou web spider|Sogou inst spider)" 1;
     ~*(?:Exabot) 1;
 }
 
