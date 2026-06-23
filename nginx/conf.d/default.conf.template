@@ -1,6 +1,23 @@
 # --- 反爬 / 限流 / 真实 IP ---
 # 若使用 Cloudflare，请把下方 set_real_ip_from 替换为 Cloudflare 公布的 IP 段
 # https://www.cloudflare.com/ips-v4 + ips-v6
+
+# 合法搜索引擎爬虫白名单 —— 这些 UA 放宽限流，避免 Googlebot/Bingbot 抓取时被 503
+# 参考：https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+map $http_user_agent $is_search_bot {
+    default 0;
+    ~*(?:Googlebot|Google-Read-Aloud|Googlebot-Image|Googlebot-News|Googlebot-Video|Mediapartners-Google|AdsBot-Google|APIs-Google) 1;
+    ~*(?:bingbot|BingPreview|adidxbot) 1;
+    ~*(?:DuckDuckBot|DuckDuckGo-Favicons-Bot) 1;
+    ~*(?:Baiduspider|Baiduspider-image|Baiduspider-news) 1;
+    ~*(?:Slurp) 1;                        # Yahoo
+    ~*(?:facebookexternalhit|Facebot) 1;  # Facebook 分享预览
+    ~*(?:Twitterbot|LinkedInBot|Pinterestbot) 1;  # 社交分享预览
+    ~*(?:Applebot) 1;                     # Apple Siri/Spotlight 建议（注意不是 Applebot-Extended）
+    ~*(?:Sogou web spider|Sogou inst spider) 1;
+    ~*(?:Exabot) 1;
+}
+
 map $http_user_agent $is_bot_ua {
     default 0;
     # --- AI 训练 / 搜索爬虫（与 robots.txt 同步）---
@@ -24,7 +41,8 @@ map $http_user_agent $is_bot_ua {
 
     # --- 主动 SEO / 监控爬虫（与 robots.txt 同步）---
     ~*(?:AhrefsBot|ahrefsbot|SemrushBot|semrushbot|DotBot|MJ12bot|BLEXBot|SeekportBot) 1;
-    ~*(?:YandexBot|YandexImages|Mail\.Ru_Bot) 1;
+    ~*(?:Mail\.Ru_Bot) 1;
+    # 注意：YandexBot 已移至白名单（$is_search_bot），不再屏蔽
 
     # --- 无脑扫描器 / 渗透工具 ---
     ~*(?:nikto|sqlmap|nmap|masscan|zgrab|nuclei|nessus|wpscan|acunetix|qualys|dirbuster|gobuster|ffuf) 1;
@@ -34,8 +52,14 @@ map $http_user_agent $is_bot_ua {
     "" 1;
 }
 
-# 单 IP 请求速率：每秒 10 个请求（突发 20）
-limit_req_zone $binary_remote_addr zone=req_per_ip:10m rate=10r/s;
+# 普通访客限流：每秒 10 个请求（突发 20）
+# 合法搜索引擎爬虫（$is_search_bot=1）的 key 为空 → nginx 不追踪，跳过限流
+# 注意：limit_conn 仍然对所有请求生效，防止伪造 UA 绕过限流压垮服务器
+map $is_search_bot $limit_key {
+    0 $binary_remote_addr;
+    1 "";
+}
+limit_req_zone $limit_key zone=req_per_ip:10m rate=10r/s;
 # 单 IP 并发连接数
 limit_conn_zone $binary_remote_addr zone=conn_per_ip:10m;
 # 静态资源不限流

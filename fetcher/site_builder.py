@@ -834,6 +834,7 @@ class SiteBuilder:
         ]
 
         # 已知的 SEO 爬虫/恶意扫描器（与 GA 流量无价值）
+        # 注意：YandexBot 已移除 —— Yandex 是俄罗斯/东欧主要搜索引擎，保留可获取全球流量
         seo_bots = [
             "AhrefsBot",
             "SemrushBot",
@@ -841,8 +842,6 @@ class SiteBuilder:
             "MJ12bot",
             "BLEXBot",
             "SeekportBot",
-            "YandexBot",
-            "YandexImages",
             "Mail.Ru_Bot",
         ]
 
