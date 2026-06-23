@@ -7,7 +7,9 @@ map $http_user_agent $is_bot_ua {
     ~*(?:GPTBot|ChatGPT-User|OAI-SearchBot|oai-searchbot) 1;
     ~*(?:ClaudeBot|Claude-SearchBot|Claude-User|Claude-Web|claude-web|anthropic-ai) 1;
     ~*(?:PerplexityBot|Perplexity-User|perplexity-user) 1;
-    ~*(?:Google-Extended|GoogleOther|google-extended) 1;
+    # 注意：GoogleOther 是 Google 通用爬虫，屏蔽会导致 GSC 报 "Server connection" 错误
+    # 仅屏蔽 Google-Extended（Gemini AI 训练），不影响常规索引
+    ~*(?:Google-Extended|google-extended) 1;
     ~*(?:Applebot-Extended|applebot-extended) 1;
     ~*(?:Bytespider|bytespider) 1;
     ~*(?:CCBot|ccbot) 1;
@@ -73,9 +75,9 @@ server {
         root /var/www/certbot;
     }
 
-    # 屏蔽明显的恶意扫描器（直接 444 关连接，不返回响应）
+    # 屏蔽明显的恶意扫描器（返回 403，不用 444 —— 444 会让 GSC 报 "Server connection" 错误）
     if ($is_bot_ua) {
-        return 444;
+        return 403;
     }
 
     add_header Strict-Transport-Security "max-age=63072000" always;
@@ -89,11 +91,6 @@ server {
 
     root /usr/share/nginx/html;
     index index.html;
-
-    # 屏蔽恶意 UA
-    if ($is_bot_ua) {
-        return 444;
-    }
 
     # 全局限流兜底
     limit_req zone=req_per_ip burst=20 nodelay;
@@ -175,9 +172,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # 屏蔽恶意 UA
+    # 屏蔽恶意 UA（返回 403，不用 444 —— 444 会让 GSC 报 "Server connection" 错误）
     if ($is_bot_ua) {
-        return 444;
+        return 403;
     }
 
     # 全局限流兜底
@@ -260,9 +257,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # 屏蔽恶意 UA
+    # 屏蔽恶意 UA（返回 403，不用 444 —— 444 会让 GSC 报 "Server connection" 错误）
     if ($is_bot_ua) {
-        return 444;
+        return 403;
     }
 
     # 全局限流兜底
