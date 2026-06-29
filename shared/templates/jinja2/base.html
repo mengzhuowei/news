@@ -57,7 +57,7 @@
     <script>(adsbygoogle = window.adsbygoogle || []).push({google_ad_client: "{{ adsense_client_id }}", enable_page_level_ads: false});</script>
     {% endif %}
 </head>
-<body{% if page_type %} data-page-type="{{ page_type }}"{% if section_name %} data-section="{{ section_name }}"{% endif %}{% if article_id %} data-article-id="{{ article_id }}" data-article-title="{{ article_title | default('') }}" data-article-source="{{ article_source | default('') }}" data-article-category="{{ article_category | default('') }}"{% endif %}{% endif %}>
+<body{% if page_type %} data-page-type="{{ page_type }}"{% if section_name %} data-section="{{ section_name }}"{% endif %}{% if article_id %} data-article-id="{{ article_id }}" data-article-title="{{ article_title | default('') }}" data-article-category="{{ article_category | default('') }}"{% endif %}{% endif %}>
     <header>
         <div class="container">
             <div class="logo-row">
@@ -87,7 +87,7 @@
     </main>
     <footer>
         <div class="container">
-            <p>&copy; 2026 {{ site_title }}. Aggregated from multiple sources.</p>
+            <p>&copy; 2026 {{ site_title }}. All rights reserved.</p>
             <p style="margin-top: 0.5rem; font-size: 0.85rem;">
                 <a href="/terms" style="color: #ccc; text-decoration: none; margin: 0 0.5rem;">Terms of Service</a> ·
                 <a href="/privacy" style="color: #ccc; text-decoration: none; margin: 0 0.5rem;">Privacy Policy</a> ·

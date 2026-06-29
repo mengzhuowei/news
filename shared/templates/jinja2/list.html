@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{{ section_name_display }} News - {{ site_title }}{% endblock %}
-{% block description %}Read the latest {{ section_name_display }} news and analysis curated from top sources including BBC, Reuters, Bloomberg, The Economist and more. Stay informed with breaking {{ section_name_display }} stories.{% endblock %}
+{% block description %}Read the latest {{ section_name_display }} news and analysis. Stay informed with breaking {{ section_name_display }} stories.{% endblock %}
 
 {% block head %}
 <meta name="keywords" content="{{ section_name_display }}, {{ section_name }} news, headlines, {{ site_title }}">
@@ -49,7 +49,7 @@
     "@context": "https://schema.org",
     "@type": "ItemList",
     "name": {{ (section_name_display + " News") | tojson }},
-    "description": "Latest {{ section_name_display }} news and analysis curated from top sources.",
+    "description": "Latest {{ section_name_display }} news and analysis.",
     "url": "{{ canonical_url }}",
     "itemListElement": [
         {% for article in articles %}
@@ -81,7 +81,7 @@
     <div class="article-card-body">
         <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
         <div class="article-meta">
-            <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.author }}
+            <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time>
         </div>
         <p class="article-summary">{{ article.summary }}</p>
     </div>
