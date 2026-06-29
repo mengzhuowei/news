@@ -67,7 +67,6 @@
             <a href="{{ hero_article.permalink }}"><img src="{{ hero_article.image }}" alt="{{ hero_article.title }}" loading="lazy" onload="if(this.naturalWidth<this.parentElement.offsetWidth*0.6)this.parentElement.classList.add('hero-float')"></a>
             {% endif %}
             <div class="hero-content">
-                <span class="source-badge">{{ hero_article.source }}</span>
                 <h3><a href="{{ hero_article.permalink }}">{{ hero_article.title }}</a></h3>
                 <div class="article-meta">
                     <time datetime="{{ hero_article.published_iso }}">{{ hero_article.published_display }}</time> &middot; {{ hero_article.author }}
@@ -83,7 +82,6 @@
             <div class="article-card article-card-side">
                 <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
                 <div class="article-card-body">
-                    <span class="source-badge">{{ article.source }}</span>
                     <h3><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
                     <div class="article-meta">{{ article.published_display }}</div>
                 </div>
@@ -99,7 +97,6 @@
             <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
             {% endif %}
             <div class="article-card-body">
-                <span class="source-badge">{{ article.source }}</span>
                 <h3><a href="{{ article.permalink }}">{{ article.title }}</a></h3>
                 <div class="article-meta">
                     <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.category }} &middot; {{ article.author }}
@@ -148,7 +145,6 @@
         <ul class="text-news-list">
             {% for article in no_image_articles %}
             <li>
-                <div class="tn-source">{{ article.source }}</div>
                 <div class="tn-title"><a href="{{ article.permalink }}">{{ article.title }}</a></div>
                 <div class="tn-meta">{{ article.published_display }}</div>
             </li>

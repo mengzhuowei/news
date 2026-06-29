@@ -333,7 +333,6 @@
             <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
             {% endif %}
             <div class="article-card-body">
-                <span class="source-badge">{{ article.source }}</span>
                 <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
                 <div class="article-meta">{{ article.published_display }}</div>
                 <p class="article-summary">{{ article.summary[:120] }}{% if article.summary | length > 120 %}...{% endif %}</p>

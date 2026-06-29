@@ -79,7 +79,6 @@
     <a href="{{ article.permalink }}"><img class="article-card-img" src="{{ article.image }}" alt="{{ article.title }}" loading="lazy"></a>
     {% endif %}
     <div class="article-card-body">
-        <span class="source-badge">{{ article.source }}</span>
         <h2><a href="{{ article.permalink }}">{{ article.title }}</a></h2>
         <div class="article-meta">
             <time datetime="{{ article.published_iso }}">{{ article.published_display }}</time> &middot; {{ article.author }}
