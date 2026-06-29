@@ -167,7 +167,4 @@ class ContentCleaner:
         return truncated + "..."
 
     def _add_copyright_notice(self, article: Article, content: str) -> str:
-        notice = f"\n\n---\n**Source:** [{article.source}]({article.url})\n"
-        if article.published:
-            notice += f"*Generated at: {article.published.strftime('%Y-%m-%d %H:%M:%S')} UTC*\n"
-        return content + notice
+        return content
